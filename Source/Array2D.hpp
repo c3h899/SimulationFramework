@@ -16,10 +16,10 @@
 template <class T>
 class Array2D {
 	public:
-		inline T get_element(const int_fast8_t row, const int_fast8_t col){
+		constexpr T get_element(const int_fast8_t row, const int_fast8_t col) const {
 			return dat[query_bounds(row)][query_bounds(col)];
 		}
-		inline void set_element(const int_fast8_t row, const int_fast8_t col, T val){
+		constexpr void set_element(const int_fast8_t row, const int_fast8_t col, T val){
 			dat[query_bounds(row)][query_bounds(col)] = std::move(val);
 		}
 	/* ==== BEGIN (Matrix ITERATOR IMPLEMENTATION) === */
@@ -38,23 +38,23 @@ class Array2D {
 			typedef T* pointer;
 			typedef T& reference;
 			// Access to neighbor elements
-			inline T prev_x() const { return *(present - 1); }
-			inline T next_x() const { return *(present + 1); }
-			inline T prev_y() const { return *(present - ARRAY_TOTAL_WIDTH); }
-			inline T next_y() const { return *(present + ARRAY_TOTAL_WIDTH); }
+			constexpr T prev_x() const { return *(present - 1); }
+			constexpr T next_x() const { return *(present + 1); }
+			constexpr T prev_y() const { return *(present - ARRAY_TOTAL_WIDTH); }
+			constexpr T next_y() const { return *(present + ARRAY_TOTAL_WIDTH); }
 			// Update position
-			void index_from(const MatIterator& other){ pos = other.pos; update_ptr(); }
+			constexpr void index_from(const MatIterator& other){ pos = other.pos; update_ptr(); }
 			// === Principle Operators ===
 			// Copy Constructor
-			MatIterator(const self_type& other) : ptr(other.ptr), 
+			constexpr MatIterator(const self_type& other) : ptr(other.ptr), 
 				present(other.present), pos(other.pos) { }
-			MatIterator(pointer pZero, size_type Pos = 0) : 
+			constexpr MatIterator(pointer pZero, size_type Pos = 0) : 
 				ptr(std::move(pZero)), pos(std::move(Pos)) { update_ptr(); }
 			// Destructor
 			~MatIterator() { }; // Nothing to Do
 			// Assignment Operator
 			// https://en.cppreference.com/w/cpp/language/operators#Assignment_operator
-			self_type& operator=(const self_type& other){
+			constexpr self_type& operator=(const self_type& other){
 				if(this != &other){
 					ptr = other.ptr;
 					present = other.present;
@@ -62,21 +62,21 @@ class Array2D {
 				}
 				return (*this);
 			}
-			self_type& operator=(const reference other){
+			constexpr self_type& operator=(const reference other){
 				*present = other;
 				return (*this);
 			}
-			self_type& operator=(value_type other) {
+			constexpr self_type& operator=(value_type other) {
 				*present = std::move(other);
 				return (*this);
 			}
-			self_type& operator++(){ ++pos; update_ptr(); return (*this); }
-			self_type operator++(int){ self_type tmp = *this; ++(*this); return tmp; }
-			self_type& operator--(){ --pos; update_ptr(); return (*this); }
-			self_type operator--(int){ self_type tmp = *this; --(*this); return tmp; }
-			reference operator*() { return *present; }
-			bool operator==(const self_type& rhs) const { return (pos == rhs.pos); }
-			bool operator!=(const self_type& rhs) const { return (pos != rhs.pos); }
+			constexpr self_type& operator++(){ ++pos; update_ptr(); return (*this); }
+			constexpr self_type operator++(int){ self_type tmp = *this; ++(*this); return tmp; }
+			constexpr self_type& operator--(){ --pos; update_ptr(); return (*this); }
+			constexpr self_type operator--(int){ self_type tmp = *this; --(*this); return tmp; }
+			constexpr reference operator*() { return *present; }
+			constexpr bool operator==(const self_type& rhs) const { return (pos == rhs.pos); }
+			constexpr bool operator!=(const self_type& rhs) const { return (pos != rhs.pos); }
 		private:
 			T* const ptr;
 			T *present; // Cache the access location
@@ -84,73 +84,73 @@ class Array2D {
 			static_assert(std::numeric_limits<size_type>::max() >
 				(ARRAY_ELEMENT_LENGTH*ARRAY_ELEMENT_LENGTH + 1),
 				"Position tracker is not large enough.");
-			inline void update_ptr(){
+			constexpr void update_ptr(){
 				present = ptr + (ARRAY_TOTAL_WIDTH*(pos >> ARRAY_ELEMENT_POWER) +
 					(pos & (ARRAY_ELEMENT_LENGTH - 1)));
 			}
 		};
-		MatIterator begin() {
+		constexpr MatIterator begin() {
 			return MatIterator(&dat[1][1], 0);
 		}
-		MatIterator end() {
+		constexpr MatIterator end() {
 			return MatIterator(&dat[1][1], ARRAY_ELEMENT_LENGTH*ARRAY_ELEMENT_LENGTH);
 		}
 	/* ==== END (Matrix ITERATOR IMPLEMENTATION) === */
 		/* Data Manipulation :: Populate Ghost Cells */
-		inline void fill_ghost_top(const Array2D& neighbor){
+		constexpr void fill_ghost_top(const Array2D& neighbor){
 			// Copies the bottom row of Neighbor into the top ghost row
 			// Assumes Neighbor is directly above (this)
 			for(auto ii = 1; ii < (ARRAY_ELEMENT_LENGTH + 1); ++ii){
 				dat[0][ii] = std::copy(neighbor.dat[ARRAY_ELEMENT_LENGTH][ii]);				
 			}
 		}
-		inline void fill_ghost_top( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
+		constexpr void fill_ghost_top( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
 			// Overloaded Method, Consumes an array of elements
 			for(auto ii = 0; ii < ARRAY_ELEMENT_LENGTH; ++ii){
 				dat[0][ii+1] = std::move(source[ii]);
 			}
 		}
-		inline void fill_ghost_bottom(const Array2D& neighbor){
+		constexpr void fill_ghost_bottom(const Array2D& neighbor){
 			// Copies the top row of Neighbor into the bottom ghost row
 			// Assumes Neighbor is directly below (this)
 			for(auto ii = 1; ii < (ARRAY_ELEMENT_LENGTH + 1); ++ii){
 				dat[ARRAY_ELEMENT_LENGTH+1][ii] = std::copy(neighbor.dat[1][ii]);				
 			}
 		}
-		inline void fill_ghost_bottom( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
+		constexpr void fill_ghost_bottom( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
 			// Overloaded Method, Consumes an array of elements
 			for(auto ii = 0; ii < ARRAY_ELEMENT_LENGTH; ++ii){
 				dat[ARRAY_ELEMENT_LENGTH+1][ii+1] = std::move(source[ii]);
 			}
 		}
-		inline void fill_ghost_left(const Array2D& neighbor){
+		constexpr void fill_ghost_left(const Array2D& neighbor){
 			// Copies the rightmost column of Neighbor into the left ghost column
 			// Assumes Neighbor is directly left of (this)
 			for(auto ii = 1; ii < (ARRAY_ELEMENT_LENGTH + 1); ++ii){
 				dat[ii][0] = std::copy(neighbor.dat[ii][ARRAY_ELEMENT_LENGTH]);				
 			}
 		}
-		inline void fill_ghost_left( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
+		constexpr void fill_ghost_left( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
 			// Overloaded Method, Consumes an array of elements
 			for(auto ii = 0; ii < ARRAY_ELEMENT_LENGTH; ++ii){
 				dat[ii+1][0] = std::move(source[ii]);
 			}
 		}
-		inline void set_ghost_right(const Array2D& neighbor){
+		constexpr void set_ghost_right(const Array2D& neighbor){
 			// Copies the rightmost column of Neighbor into the left ghost column
 			// Assumes Neighbor is directly right of (this)
 			for(auto ii = 1; ii < (ARRAY_ELEMENT_LENGTH + 1); ++ii){
 				dat[ii][ARRAY_ELEMENT_LENGTH+1] = std::copy(neighbor.dat[ii][0]);				
 			}
 		}
-		inline void set_ghost_right( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
+		constexpr void set_ghost_right( T(&&source)[ARRAY_ELEMENT_LENGTH] ){
 			// Overloaded Method, Consumes an array of elements
 			for(auto ii = 0; ii < ARRAY_ELEMENT_LENGTH; ++ii){
 				dat[ii+1][ARRAY_ELEMENT_LENGTH+1] = std::move(source[ii]);
 			}
 		}
 		/* CPP Operators */
-		friend std::ostream& operator<<(std::ostream &stream, const Array2D<T> &array){
+		constexpr friend std::ostream& operator<<(std::ostream &stream, const Array2D<T> &array){
 			stream << std::fixed << std::setprecision(0);
 			for(int_fast8_t ii = 1; ii < ARRAY_ELEMENT_LENGTH + 1; ++ii){
 				for(int_fast8_t jj = 1; jj < ARRAY_ELEMENT_LENGTH + 1 ; ++jj){
