@@ -4,6 +4,7 @@
 #include <iostream>
 //#include <memory_resource> //TODO: LIBC Lacks polymorphic allocators
 #include <mutex>
+#include <memory>
 #include <list>
 #include <utility>
 
@@ -35,27 +36,27 @@ class ManagedVariable{
 		~ManagedVariable() { }
 		constexpr iterator_t create_element(){
 			std::lock_guard<std::mutex> lock(resource_lock);
-			cont.emplace_back(T());
-			return std::prev(cont.end());
+			cont->emplace_back(T());
+			return std::prev(cont->end());
 		}
 		constexpr iterator_t create_element(T&& source){
 			std::lock_guard<std::mutex> lock(resource_lock);
-			cont.emplace_back(std::forward<T>(source));
-			return std::prev(cont.end());
+			cont->emplace_back(std::forward<T>(source));
+			return std::prev(cont->end());
 		}
 		template <class... Args> // Emplacement Constructor (In-place construction)
 		constexpr iterator_t emplace_element(Args&&... args){
 			std::lock_guard<std::mutex> lock(resource_lock);
-			cont.emplace_back(std::forward<Args>(args)...);
-			return std::prev(cont.end());
+			cont->emplace_back(std::forward<Args>(args)...);
+			return std::prev(cont->end());
 		}
 		constexpr void erase(iterator_t &&element) {
-			if(element != cont.end()){cont.erase(std::forward<iterator_t>(element));}
+			if(element != cont->end()){cont->erase(std::forward<iterator_t>(element));}
 		}
 		constexpr friend std::ostream& operator<<(std::ostream &stream, const ManagedVariable<T> &var){
 			std::lock_guard<std::mutex> lock(var.resource_lock); // Very limited good
-			auto ii = var.cont.begin();
-			const auto jj = var.cont.end();
+			auto ii = var.cont->begin();
+			const auto jj = var.cont->end();
 			if(ii != jj){stream << *ii; ++ii;}			
 			for(; ii != jj; ++ii){stream << ";\n" << *ii;}
 			return stream;
@@ -64,7 +65,7 @@ class ManagedVariable{
 		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
 //		std::pmr::memory_resource& mr;
 //		container_t cont(&mr);
-		container_t cont;
+		std::unique_ptr<container_t> cont = std::make_unique<container_t>();
 };
 
 

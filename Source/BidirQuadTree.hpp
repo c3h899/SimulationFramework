@@ -3,8 +3,9 @@
 
 #include <cinttypes>
 #include <iostream>
-#include <memory>
 #include <list>
+#include <memory>
+#include <tuple>
 
 #include "Physics.hpp"
 
@@ -168,51 +169,54 @@ class BidirQuadTree{
 				return 1;
 			}
 		}
-		constexpr child_ptr* find_me(node_iter &target){
+		constexpr std::tuple<child_ptr*, uint8_t> find_me(node_iter &target){
 			node_iter parent = *target.parent;
 			const node_iter end = Nodes.end();
 			if(parent != end){ // Avoid Dereferencing Null Pointers		
 				if((*parent.is_node_ptr & position::negX_posY) &&
 					(*parent.children[0][1].node == target)) { 
-					return &(*parent.children[0][1]);
+					return std::make_tuple(&(*parent.children[0][1]), position::negX_posY);
 				} else if((*parent.is_node_ptr & position::posX_posY) &&
 					(*parent.children[1][1].node == target)) { 
-					return &(*parent.children[1][1]);
+					return std::make_tuple(&(*parent.children[1][1]), position::posX_posY);
 				} else if((*parent.is_node_ptr & position::negX_negY) &&
 					(*parent.children[0][0].node == target)) { 
-					return &(*parent.children[0][0]);
+					return std::make_tuple(&(*parent.children[0][0]), position::negX_negY);
 				} else if((*parent.is_node_ptr & position::posX_negY) &&
 					(*parent.children[1][0].node == target)) { 
-					return &(*parent.children[1][0]);
+					return std::make_tuple(&(*parent.children[1][0]), position::posX_negY);
 				} else {
-					return nullptr;
+					return std::make_tuple<child_ptr*, uint8_t>(nullptr, 0x00);
 				}
 			} else {
-				return nullptr;
+				return std::make_tuple<child_ptr*, uint8_t>(nullptr, 0x00);
 			}
 		}
 		constexpr uint8_t delete_node(node_iter &target){
 			if(!(*target.is_node_ptr)){ // Verify all child nodes are Data
 				recursive_free(target);
-				// Re-Write the Pointer to node_iter to be interators....
 			} else {
 				return 1;
 			}
 		}
-		constexpr uint8_t prune(node_iter &target){
+		constexpr uint8_t prune(node_iter target){
 		/* 
 		 * (!) Warning NO effort to populate most recent results to
 		 * Multigrid reduction node will be made. This MUST be done prior.
 		 */
-			if(target->parent != nullptr){
-				if(!((*target).is_node_ptr)){ // Verify all child nodes are Data
-					child_ptr *temp = find_me(target);
+			if( (*target).parent != Nodes.end() ){
+				if( !((*target).is_node_ptr) ){ // Verify all child nodes are Data
+					std::tuple<child_ptr*, uint8_t> me = find_me(target);
+					child_ptr *temp  = std::get<0>(me);
+					uint8_t position = std::get<1>(me);
 					if(temp != nullptr){
-						
 						// Push the Child Node's Data to the Parent
+						*(temp).data = std::move((*target).redux);
+						*((*target).parent).is_node_ptr &= ~position;
 						// Free the Child's Resources
+						recursive_free(target);
 						// Delete the Child
-
+						Nodes.erase(target);
 						return 0;
 					} else {
 						std::cerr << "Attemped to Prune() not a child." << std::endl;
@@ -255,6 +259,8 @@ class BidirQuadTree{
 			} else {
 				Generator->erase((*head).children[1][0].data);
 			}
+			// (!) Untested, is believe to avoid leaking resrouces
+			Nodes.erase(head);
 		}
 };
 
