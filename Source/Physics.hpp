@@ -35,10 +35,11 @@ class PhysicsData{
 				return stream;
 			}
 		};
-		constexpr PhysicsNode get_node(){
+		typedef PhysicsNode return_t; // Used externally
+		constexpr return_t get(){
 			return PhysicsNode(Phi.create_element(), Rho_E.create_element());
 		}
-		constexpr void erase(PhysicsNode &&node){
+		constexpr void erase(PhysicsNode &node){
 			Phi.erase(std::forward<IT>(node.phi));
 			Rho_E.erase(std::forward<IT>(node.rho));
 		}

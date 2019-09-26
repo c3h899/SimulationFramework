@@ -28,7 +28,8 @@ class ManagedVariable{
 //		typedef std::list<T, std::pmr::polymorphic_allocator> container_t;
 		typedef std::list<T> container_t;
 		typedef typename std::list<T>::iterator iterator_t;
-		constexpr ManagedVariable(std::size_t blocks = 0){ // Takes number of blocks/chunk
+//		constexpr ManagedVariable(std::size_t blocks = 0){ // Takes number of blocks/chunk
+		constexpr ManagedVariable(){ // Edited to address -Wunused
 //			mr = std::pmr::unsynchronized_pool_resource{sizeof(T), blocks};
 		}
 		~ManagedVariable() { }
