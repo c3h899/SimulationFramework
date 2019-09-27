@@ -18,12 +18,31 @@
 template<class G>
 class BidirQuadTree;
 
+class bit{
+	/*
+	 * CPP Should express intent.
+	 * ---
+	 * This Class provides bit manipulation of bytes (uint8_t)
+	 * Ideally, this entire class is optimized away.
+	 */
+	public:
+		typedef uint8_t byte;
+		// GCC Throws -Wconversion when using any of the stock bitwise operators
+		static constexpr byte pos(int position) { return flag(position); }
+		static constexpr void set(byte& rhs, int pos) { rhs = rhs | flag(pos) ; }
+		static constexpr void clear(byte& rhs, int pos) { rhs = rhs & nflag(pos); }
+		static constexpr byte is_set(byte const& rhs, int pos) { return rhs & flag(pos); }
+	private:
+		static constexpr byte Pos[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+		static constexpr byte flag(int position) { return Pos[position & 0x0F]; }
+		static constexpr byte nflag(int position) { return byte(~Pos[position & 0x0F]); }
+};
+
 template<class G>
 class TreeNode {
 	public:
 		typedef typename G::return_t return_t;
 		typedef typename std::list<TreeNode<G>>::iterator node_iter;
-
 		union child_ptr{    // Space-saving measure for mutually exclusive data
 			return_t data;  // Collection of data iterators (Relevant Details)
 			node_iter node;   // Child Node in tree
@@ -33,98 +52,62 @@ class TreeNode {
 			~child_ptr(){}; // Leave data unhandled on destruction
 		};
 
-		enum position : uint8_t {
-			// 2D Values are Aliased to 3D Representation in negZ
-			negX_negY = 0x01, negX_negY_negZ = negX_negY, // (Behind) Down-Left
-			negX_posY = 0x02, negX_posY_negZ = negX_posY, // (Behind) Up-Left
-			posX_negY = 0x04, posX_negY_negZ = posX_negY, // (Behind) Down-Right
-			posX_posY = 0x08, posX_posY_negZ = posX_posY, // (Behind) Up-Right
-			negX_negY_posZ = 0x10, // (Front) Down-Left
-			negX_posY_posZ = 0x20, // (Front) Up-Left
-			posX_negY_posZ = 0x40, // (Front) Down-Right
-			posX_posY_posZ = 0x80  // (Front) Up-Right
+		enum position : uint8_t { // Express Position in the array contenxtually
+			// 2D Values are Aliased to 3D Representation, Back
+			  up_left        = 0,
+			  up_right       = 1,
+			down_left        = 2,
+			down_right       = 3,
+			/* Unused
+			  up_left_back  = up_left,			
+			  up_left_front  = 4,
+			  up_right_back = up_right,
+			  up_right_front = 5,
+			down_left_back  = down_left,
+			down_left_front  = 6,
+			down_right_back = down_right,
+			down_right_front = 7
+			 */
 		};
 
 		// Used for Constructing the Head
 		constexpr TreeNode(G *gen) : redux(gen->get()), 
-			parent(nullptr), scale(0), is_node_ptr(0x00) // <===========
+			parent(nullptr), scale(0), is_node(0x00) // <=======================
 		{
-			children[0][0] = std::move( child_ptr(gen->get()) );
-			children[0][1] = std::move( child_ptr(gen->get()) );
-			children[1][0] = std::move( child_ptr(gen->get()) );
-			children[1][1] = std::move( child_ptr(gen->get()) );
+			for(auto &&child : children){ // Lazy Programming is the best
+				child = std::move( child_ptr(gen->get()) );
+			}
 		}
 		// Used for Constructing subsequent Nodes
 		constexpr TreeNode(G *gen, node_iter &&head, uint8_t pos) : 
-			parent(std::move(head)), scale(head->scale + 1), is_node_ptr(0x00)
+			parent(std::move(head)), scale(head->scale + 1), is_node(0x00)
 		{
-			/*
-			 * (Unofficial) Right-Handed Cartesion Order
-			 * Taken from declaration of childern (Official) order.
-			 * ----
-			 * Assert {[0][0] : NegX NegY, [0][1] : NegX PosY
-			 *         [1][0] : PosX NegY, [1][1] : PosX PosY}
-			 */
-			switch(pos){ // Capture the previous Data as Redux; take its place
-				case position::negX_negY :
-					redux.data = std::move(*head.children[0][0].data);
-					*head.is_node_ptr |= pos;
-					*head.children[0][0].node = this;
-					break;
-				case position::negX_posY :
-					redux.data = std::move(*head.children[0][1].data);
-					head->is_node_ptr |= pos;
-					*head.children[0][1].node = this;
-					break;
-				case position::posX_negY :
-					redux.data = std::move(*head.children[1][0].data);
-					head->is_node_ptr |= pos;
-					*head.children[1][0].node = this;
-					break;
-				case position::posX_posY :
-					redux.data = std::move(*head.children[1][1].data);
-					head->is_node_ptr |= pos;
-					*head.children[1][1].node = this;
-					break;
-				default:
-					redux = std::move(gen->get());
-					std::cerr << "Invalid Construction of Tree Node" << std::endl; 
+			if(pos < 4){ // Capture the previous Data as Redux; take its place
+				redux.data = std::move(*head.children[pos].data);
+				bit::set(*head.is_node, pos);
+				*head.children[pos].node = this;
+			} else {
+				redux = std::move(gen->get());
+				std::cerr << "Invalid Construction of Tree Node" << std::endl;
 			}
-			children[0][0] = std::move( child_ptr(gen->get()) );
-			children[0][1] = std::move( child_ptr(gen->get()) );
-			children[1][0] = std::move( child_ptr(gen->get()) );
-			children[1][1] = std::move( child_ptr(gen->get()) );
+			for(auto &&child : children){ // Lazy Programming is the best
+				*child = std::move( child_ptr(gen->get()) );
+			}
 		}
 		~TreeNode() {std::cout << "Goodby, Tree" << std::endl;}
 		constexpr void print_traits(){
 			std::cout << "[Node]\n" << "Parent: " << (void*) parent;
 			std::cout << "Relative Scale: 2^-" << scale << "\n";
 			std::cout << "Reduction Node " << (void*) &redux << "\n";
-			std::cout << "Up-Left: ";
-			if(is_node_ptr & negX_posY){
-				std::cout << "Has Child Node " << (void*) &children[0][1].node;
-			} else {
-				std::cout << "Has Data Elem. " << (void*) &children[0][1].data;
+
+			for(auto ii = 0; ii < 4; ++ii){
+				std::cout << "Child (" << ii << ") ";
+				if(bit::is_set(is_node, ii)){
+					std::cout << "is a node: " << (void*) &children[ii].node;
+				} else {
+					std::cout << "is data: " << (void*) &children[ii].data;
+				}
 			}
-			std::cout << "\nUp-Right: ";
-			if(is_node_ptr & posX_posY){
-				std::cout << "Has Child Node " << (void*) &children[1][1].node;
-			} else {
-				std::cout << "Has Data Elem. " << (void*) &children[1][1].data;
-			}
-			std::cout << "\nDown-Left: ";
-			if(is_node_ptr & negX_negY){
-				std::cout << "Has Child Node " << (void*) &children[0][0].node;
-			} else {
-				std::cout << "Has Data Elem. " << (void*) &children[0][0].data;
-			}
-			std::cout << "\nDown-Right: ";
-			if(is_node_ptr & posX_negY){
-				std::cout << "Has Child Node " << (void*) &children[1][0].node;
-			} else {
-				std::cout << "Has Data Elem. " << (void*) &children[1][0].data;
-			}
-			std::cout << "\n" << std::endl;
 		}
 	private:
 		friend class BidirQuadTree<G>; // The tree can interact with member variables
@@ -135,8 +118,8 @@ class TreeNode {
 		 * Child nodes may be either data or additional tree notes
 		 * Care to handle member access and deletion will be needed
 		 */
-		uint8_t is_node_ptr = 0x00; // Tracks if pointer is to another node (!data)
-		child_ptr children[2][2]; // Default state to nullptr
+		uint8_t is_node = 0x00; // Tracks if pointer is to another node (!data)
+		child_ptr children[4]; // Default state to nullptr
 };
 
 template<class G>
@@ -159,10 +142,10 @@ class BidirQuadTree{
 		gen_t Generator;
 		cont_t Nodes;
 		constexpr uint8_t branch(node_iter &&head, uint8_t pos){
-			if(!(*head.is_node_ptr & pos)){
+			if(!(*head.is_node & pos)){
 				Nodes.emplace_back(TreeNode(Generator.get(),
 					std::forward<node_iter>(head), pos));
-				*head.is_node_ptr |= pos; // Update Flags to Reflect Change <====================
+				bit::set(*head.is_node, pos);
 				return 0;
 			} else {
 				std::cerr << "Error, Node is Already Branched" << std::endl;
@@ -172,28 +155,20 @@ class BidirQuadTree{
 		constexpr std::tuple<child_ptr*, uint8_t> find_me(node_iter &target){
 			node_iter parent = *target.parent;
 			const node_iter end = Nodes.end();
-			if(parent != end){ // Avoid Dereferencing Null Pointers		
-				if((*parent.is_node_ptr & position::negX_posY) &&
-					(*parent.children[0][1].node == target)) { 
-					return std::make_tuple(&(*parent.children[0][1]), position::negX_posY);
-				} else if((*parent.is_node_ptr & position::posX_posY) &&
-					(*parent.children[1][1].node == target)) { 
-					return std::make_tuple(&(*parent.children[1][1]), position::posX_posY);
-				} else if((*parent.is_node_ptr & position::negX_negY) &&
-					(*parent.children[0][0].node == target)) { 
-					return std::make_tuple(&(*parent.children[0][0]), position::negX_negY);
-				} else if((*parent.is_node_ptr & position::posX_negY) &&
-					(*parent.children[1][0].node == target)) { 
-					return std::make_tuple(&(*parent.children[1][0]), position::posX_negY);
-				} else {
-					return std::make_tuple<child_ptr*, uint8_t>(nullptr, 0x00);
+			if(parent != end){
+				for(auto ii = 0; ii < 4; ++ii){
+					if( (bit::is_set(*parent.is_node, ii)) &&
+						(*parent.children[ii].node == target) )
+					{
+						return std::make_tuple(&(*parent.children[ii]), ii);
+					}
 				}
 			} else {
 				return std::make_tuple<child_ptr*, uint8_t>(nullptr, 0x00);
 			}
 		}
 		constexpr uint8_t delete_node(node_iter &target){
-			if(!(*target.is_node_ptr)){ // Verify all child nodes are Data
+			if(!(*target.is_node)){ // Verify all child nodes are Data
 				recursive_free(target);
 			} else {
 				return 1;
@@ -205,14 +180,14 @@ class BidirQuadTree{
 		 * Multigrid reduction node will be made. This MUST be done prior.
 		 */
 			if( (*target).parent != Nodes.end() ){
-				if( !((*target).is_node_ptr) ){ // Verify all child nodes are Data
+				if( !((*target).is_node) ){ // Verify all child nodes are Data
 					std::tuple<child_ptr*, uint8_t> me = find_me(target);
 					child_ptr *temp  = std::get<0>(me);
 					uint8_t position = std::get<1>(me);
 					if(temp != nullptr){
 						// Push the Child Node's Data to the Parent
 						*(temp).data = std::move((*target).redux);
-						*((*target).parent).is_node_ptr &= ~position;
+						*((*target).parent).is_node &= ~position;
 						// Free the Child's Resources
 						recursive_free(target);
 						// Delete the Child
@@ -235,34 +210,17 @@ class BidirQuadTree{
 			// Free the resources tracked in the tree
 			// (!) When things break (segfault), start by looking here.
 			const node_iter end = Nodes.end();
-			if((*head).is_node_ptr & position::negX_posY){
-				auto temp = (*head).children[0][1].node;
-				if(temp != end){ recursive_free(temp); }
-			} else {
-				Generator->erase((*head).children[0][1].data);
-			}
-			if(head->is_node_ptr & position::posX_posY){ 
-				auto temp = (*head).children[1][1].node;
-				if(temp != end){ recursive_free(temp); }
-			} else {
-				Generator->erase((*head).children[1][1].data);
-			}
-			if(head->is_node_ptr & position::negX_negY){ 
-				auto temp = (*head).children[0][0].node;
-				if(temp != end){ recursive_free(temp); }
-			} else {
-				Generator->erase((*head).children[0][0].data);
-			}
-			if(head->is_node_ptr & position::posX_negY){ 
-				auto temp = (*head).children[1][0].node;
-				if(temp != end){ recursive_free(temp); }
-			} else {
-				Generator->erase((*head).children[1][0].data);
+			for(auto ii = 0; ii < 4; ++ii){
+				if(bit::is_set((*head).is_node, ii)){
+					auto temp = (*head).children[ii].node;
+					if(temp != end){ recursive_free(temp); }
+				} else {
+					Generator->erase((*head).children[ii].data);
+				}
 			}
 			// (!) Untested, is believe to avoid leaking resrouces
 			Nodes.erase(head);
 		}
 };
-
 
 #endif // BIDIR_QUAD_TREE_H_
