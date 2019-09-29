@@ -33,7 +33,13 @@ class ManagedVariable{
 		constexpr ManagedVariable(){ // Edited to address -Wunused
 //			mr = std::pmr::unsynchronized_pool_resource{sizeof(T), blocks};
 		}
-		~ManagedVariable() { }
+		~ManagedVariable() {
+			auto num_elem = cont->size();
+			if(num_elem != 0){
+				std::cerr << "(Resource Leak) ManagedVariable Has: ";
+				std::cerr << num_elem << " Elements at destruction." << std::endl;
+			}
+		}
 		constexpr iterator_t create_element(){
 			std::lock_guard<std::mutex> lock(resource_lock);
 			cont->emplace_back(T());

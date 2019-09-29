@@ -166,6 +166,7 @@ class Array2D {
 		constexpr std::ptrdiff_t query_bounds(const std::ptrdiff_t position){
 			return (position & (ARRAY_ELEMENT_LENGTH - 1)) + 1;
 		}
+
 		// Data
 		T dat[ARRAY_ELEMENT_LENGTH + 2][ARRAY_ELEMENT_LENGTH + 2];
 		/** Ghost Cells & Base data ared store in a continuous block.

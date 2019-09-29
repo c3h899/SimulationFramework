@@ -5,9 +5,12 @@ LIBDIR := Libraries
 # The name of the project (names the compiled binary)
 BINARY_NAME = code
 
+# Python 2.7
+PYTHON_INCLUDE = /usr/include/python2.7
+
 # COMPILER OPTIONS
-COMPILE_OPTIONS = -pthread -fopenmp
-LINK_OPTIONS = -fopenmp
+COMPILE_OPTIONS = -pthread -fopenmp -lpython2.7
+LINK_OPTIONS = -fopenmp -lpython2.7
 
 #************************************************************************
 # Support for Additional compile-time parameters
@@ -82,7 +85,7 @@ VPATH=$(SOURCEDIR):$(shell find $(LIBDIR) -maxdepth 1 -type d -printf '%f:')
 # https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
 
 # [COMMON] "Extra flags to give to the C preprocessor and programs that use it (the C and Fortran compilers)."
-CPPFLAGS = -Wall $(CPP_DEBUG) $(COMPILE_OPTIMIZATION) -MMD $(COMPILE_OPTIONS) -I$(SOURCEDIR) $(shell find $(LIBDIR) -maxdepth 1 -type d -printf ' -I%p')
+CPPFLAGS = -Wall $(CPP_DEBUG) $(COMPILE_OPTIMIZATION) -MMD $(COMPILE_OPTIONS) -I$(SOURCEDIR) $(shell find $(LIBDIR) -maxdepth 1 -type d -printf ' -I%p') -I$(PYTHON_INCLUDE)
 
 # [CPP] "Extra flags to give to the C++ compiler."
 CXXFLAGS = -fPIC -std=c++17 -fno-elide-constructors -fno-exceptions
@@ -96,7 +99,8 @@ LDFLAGS = -fPIC $(LD_BUILD) $(LINK_OPTIONS) -Xlinker --warn-common $(OS_LINKER)
 # see: https://gcc.gnu.org/onlinedocs/gcc-4.6.1/gcc/Link-Options.html for details
 
 # [LINKER] "Library flags or names given to compilers when they are supposed to invoke the linker"
-LDLIBS = 
+#LDLIBS = 
+#LD_LIBRARY_PATH =
 
 #### TOOLCHAIN ####
 # Names for the compiler programs
@@ -188,6 +192,7 @@ version:
 $(BINARY_NAME): $(OBJECTS)
 	@printf "\n$(COLOR_INFO_PRE)($$(date --rfc-3339=seconds)) [LINK BINARY] $@$(COLOR_INFO_POST)\n"
 	$(CXX) $(CPP_DEBUG) -o $@ $(OBJECTS) $(LDFLAGS)
+#  -Xlinker -I$(PYTHON_INCLUDE) -lpython2.7
 	@# Everything goes to hell if CC is called, not CXX
 
 #### IMPLICIT RULES (DEFINED) ####
