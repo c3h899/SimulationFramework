@@ -6,12 +6,15 @@
 #include <iostream>
 #include <list>
 #include <memory>
+#include <string>
 #include <tuple>
 
 #include "Array2D.hpp"
 #include "Bit.hpp"
 #include "PlottingRoutines.hpp"
 #include "Physics.hpp"
+
+#define PRINT_NODES
 
 /*
  * Interface Specifications (Drafted as Needed)
@@ -38,6 +41,7 @@ class TreeNode {
 
 		enum position : uint8_t { // Express Position in the array contenxtually
 			// 2D Values are Aliased to 3D Representation, Back
+			// (!) NO NOT EDIT. Values are Used as direct array access modifies.
 			  up_left        = 0,
 			  up_right       = 1,
 			down_left        = 2,
@@ -53,7 +57,8 @@ class TreeNode {
 			down_right_front = 7,
 			 */
 			multigrid        = 8,
-			head			 = 9
+			head			 = 9,
+			invalid			 = 10,
 		};
 
 		// Used for Constructing the Head
@@ -108,7 +113,7 @@ class TreeNode {
 		 */
 		constexpr TreeNode(G *gen, node_iter &head, uint8_t pos) : 
 			redux( std::move(head->children[pos].data) ), parent(head),
-			scale(int8_t((head->scale)+1)),is_node(0x00), rel_pos(position::head)
+			scale(int8_t((head->scale)+1)),is_node(0x00), rel_pos(pos)
 		{
 			
 			for(auto &&child : children){ // Lazy Programming is the best
@@ -119,6 +124,8 @@ class TreeNode {
 
 template<class G>
 class BidirQuadTree{
+	// TODO: Thead This
+	// TODO: Cached Lookup of Addresses
 	public:
 		typedef typename G::return_t return_t;
 		typedef TreeNode<G> node_t;
@@ -150,8 +157,8 @@ class BidirQuadTree{
 				recursive_draw_node(head, 0.0, 0.0, phys_length);
 			}
 		}
-// ===========================
-		constexpr void grow_until(double h){
+
+		constexpr void grow_uniformly(double h){
 			auto head = Nodes.begin();
 			double ratio = ceil(log2(phys_length / h));
 			double cell = double(ARRAY_ELEMENT_POWER);
@@ -161,13 +168,65 @@ class BidirQuadTree{
 //			std::cout << " N: " << (int) N << std::endl;
 			if(head->scale < N){ recursive_grow(head, N); }
 		}
-// ===========================
+// ================== Should be Private, but are not ========================
+		void testing_ground(){
+			auto ii = Nodes.begin(); ++ii; // Node 0 Returns itself
+			for(; ii != Nodes.end(); ++ii){
+				for(auto jj = 0; jj < 4; ++jj){ 
+					auto ptr = find_node(ii, jj, ii->rel_pos);
+					std::cout << "{Node}: " << (void*) &*ii <<" (";
+					int pos = (int) ii->rel_pos;
+					std::cout << pos;
+					if     (pos == 0){std::cout << "-UL";}
+					else if(pos == 1){std::cout << "-UR";}
+					else if(pos == 2){std::cout << "-DL";}
+					else if(pos == 3){std::cout << "-DR";}
+					else if(pos == 9){std::cout << "-HEAD";}
+					else{ }
+					std::cout << ") -";
+					if     (jj == 0){std::cout << "--(Up)--";}
+					else if(jj == 1){std::cout << "-(Down)-";}
+					else if(jj == 2){std::cout << "-(Left)-";}
+					else if(jj == 3){std::cout << "-(Right)";}
+					else{ }
+					std::cout << "-> {Neighbor}: " << (void*) &*ptr;
+					pos = (int) ptr->rel_pos;
+					std::cout << " (" << pos;
+					if     (pos == 0){std::cout << "-UL";}
+					else if(pos == 1){std::cout << "-UR";}
+					else if(pos == 2){std::cout << "-DL";}
+					else if(pos == 3){std::cout << "-DR";}
+					else if(pos == 9){std::cout << "-HEAD";}
+					else{ }
+					std::cout << ")" << std::endl;
+				}
+			}
+		}
+
+		void print_list(){
+			auto ii = Nodes.begin();
+			std::string predicate = "";
+			recursive_print_list(ii, predicate);
+		}
+
 	private:
 		typedef std::list<node_t> cont_t;
 		double phys_length; // Physical Significance : Length of a Side (Square)
 		gen_t Generator;
 		cont_t Nodes;
 		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
+		
+		enum direction : uint8_t { // Express Position in the array contenxtually
+			// (!) NO NOT EDIT. Values are Used as direct array access modifies.
+			up				 = 0,
+			down			 = 1,
+			left			 = 2,
+			right			 = 3,
+			center			 = 4,
+			null			 = 5,
+			invalid			 = 6,
+		};
+
 		constexpr uint8_t branch(node_iter &head, uint8_t pos){
 			uint8_t ret = 1;
 			std::lock_guard<std::mutex> lock(resource_lock);
@@ -193,8 +252,55 @@ class BidirQuadTree{
 			return ret;
 		}
 
+		constexpr node_iter& find_node(node_iter& Parent, uint8_t dir, int8_t rel_pos){
+			// TODO: Cached Lookup
+
+			// Look-up table routing[from][to]
+			const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
+		// Direction: ---Up---           ---Down---		       ---Left---          ---Right---
+		/* UL */{position::invalid,  position::down_left,  position::invalid,   position::up_right},
+		/* UR */{position::invalid,  position::down_right, position::up_left,   position::invalid},
+		/* DL */{position::up_left,  position::invalid,    position::invalid,   position::down_right},
+		/* DR */{position::up_right, position::invalid,    position::down_left, position::invalid}
+			};
+			const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
+				direction::down,  // Request for {Up   } mapped to Down
+				direction::up,    // Request for {Down } mapped to Up
+				direction::right, // Request for {Left } mapped to Right
+				direction::left   // Request for {Right} mapped to Left
+			};
+
+			uint8_t pos = routing[rel_pos][dir];
+			if(pos != position::invalid){
+				return (Bit::is_set(Parent->is_node, pos)) ? (Parent->children[pos].node) : (Parent);
+			} else {
+				// Recusively ask parent for neighbor
+				if(Parent->scale > 0){
+					node_iter& find = find_node(Parent->parent, dir, Parent->rel_pos);
+					if(find != Parent->parent){
+						return find;
+					} else {
+						return find;
+					}
+/*				
+				uint8_t false_dir = false_direction[pos]; // Reflection
+				if( (find->scale) == (Parent->scale) ) {
+					return( find->children[false_dir].node );
+				} else if( (find->scale) < (Parent->scale) ) { // Repeated stop condition
+					node_iter& find2 = find_node(find, false_dir, Parent->rel_pos);
+					if(find == find2){ return find2; } // Node May not Exist (Is Data)
+				} else { // Find Scale > Parent Scale
+					std::cerr << "Invalid Search, Result Smaller than Query" << std::endl;
+				}
+*/
+				} else {
+					return Parent; // Returns Parent if no match by N == 0
+				}
+			}
+		}
+
 		constexpr void recursive_grow(node_iter& head, int8_t N){
-			for(uint8_t ii = 0; ii < 4; ++ii){ // Depth-first search
+			for(uint8_t ii = 2; ii < 4; ++ii){ // Depth-first search
 				if( Bit::is_set(head->is_node, ii) ){
 					std::cerr << "Attempted to Grow in Presence of Nodes" << std::endl;				
 				} else {
@@ -209,7 +315,27 @@ class BidirQuadTree{
 			}
 		}
 
-		static constexpr node_iter get_node(node_iter base, uint8_t pos, int8_t order){
+		void recursive_print_list(node_iter& head, std::string predicate){
+			std::cout << predicate;			
+			if(head->rel_pos == position::head){
+				std::cout << "{Head}  ";
+			} else {
+				std::cout << "{Child} ";
+			}
+			std::cout << &*head << " (" << (int) head->rel_pos << ")" << std::endl;
+			predicate = predicate + "   |  ";
+			for(auto ii = 0; ii < 4; ++ii){
+				if(Bit::is_set(head->is_node, ii)){
+					recursive_print_list(head->children[ii].node, predicate);
+				} else {
+					std::cout << predicate << "{Data}  ";
+					std::cout << (void*) &head->children[ii].data << " (";
+					std::cout << (int) ii << ")" << std::endl;
+				}
+			}
+		}
+
+		static constexpr node_iter get_node(node_iter* base, uint8_t pos, int8_t order){
 			int8_t delta = base->scale - order;
 			return ( (delta < 0) && Bit::is_set(base->is_node, pos) ) ? 
 				(base->children[pos].node) : (base);

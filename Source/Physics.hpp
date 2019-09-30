@@ -19,6 +19,13 @@ class PhysicsData{
 		 * the individual resource nodes.
 		 */
 		typedef typename ManagedVariable<T>::iterator_t IT;
+
+		enum boundary_type : uint8_t {
+			none	  = 0, // Not a Bounary (Testing for Zero can be quite fast)
+			dirichlet = 1, // First-type
+			neumann   = 2 // Second-type
+		};
+
 		struct PhysicsNode{
 			/* 
 			 * (!) Warning (!) Node Requires External Removal & Cleanup
