@@ -24,7 +24,6 @@ int main(void){
 	typedef typename std::shared_ptr<BidirQuadTree<phys_t>> tree_prt_st; // Tree
 	typedef typename std::shared_ptr<phys_t> phys_ptr_st; // Shared Pointer
 
-
 	// Physics Data, Array2D, ManagedVariable --- Demonstration 
 	phys_ptr_st Phys = std::make_shared<phys_t>();
 /*
@@ -46,23 +45,12 @@ int main(void){
 	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(temp), 1.0 );
 
 	/*** Plotting --- Testing ***/
-	Tree->grow_uniformly(1.0/128.0); // Hard-coded to give non-uniform branching
+	Tree->grow_uniformly(1.0/256.0); // Hard-coded to give non-uniform branching
 	Tree->print_list();
-	Tree->testing_ground();
-/*
-	double h = 1.0;
-	plot_rect(0.0, 0.0, h/2.0);
-	plot_rect(0.0, 0.5, h/2.0);
-	plot_rect(0.5, 0.5, h/4.0);
-	plot_rect(0.5, 0.75, h/4.0);
-	plot_rect(0.75, 0.75, h/4.0);
-	plot_rect(0.75, 0.5, h/4.0);
-	plot_rect(0.5, 0, h/2.0);
-*/
-/*
+	Tree->debug_find_node();
+
 	// std::cout << "plt::show() is a blocking function." << std::endl;
 	Tree->draw_tree();
     plt::show();
-*/
 }
 

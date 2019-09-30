@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 
 #include "Array2D.hpp"
 #include "Bit.hpp"
@@ -138,6 +139,9 @@ class BidirQuadTree{
 			phys_length(len), Generator(std::move(Gen))
 		{
 			Nodes.emplace_back(Generator.get());
+			for(auto ii = 0; ii < 4; ++ii){
+				cache.emplace_back(new std::unordered_map<node_t*, find_t>());
+			}
 		}
 		~BidirQuadTree(){
 			if(Nodes.begin() != Nodes.end()) {
@@ -169,36 +173,52 @@ class BidirQuadTree{
 			if(head->scale < N){ recursive_grow(head, N); }
 		}
 // ================== Should be Private, but are not ========================
-		void testing_ground(){
+		void debug_find_node(){ // (!!) Yes, find_node() was miserable to setup
 			auto ii = Nodes.begin(); ++ii; // Node 0 Returns itself
 			for(; ii != Nodes.end(); ++ii){
-				for(auto jj = 0; jj < 4; ++jj){ 
-					auto ptr = find_node(ii, jj, ii->rel_pos);
+				for(uint8_t jj = 0; jj < 4; ++jj){
+					auto tup = find_node_sym(ii, jj, ii->rel_pos); // Wrapper Call for Ease of Parsing
+					node_iter& ptr = std::get<0>(tup);
+					int reason = int(std::get<1>(tup));
 					std::cout << "{Node}: " << (void*) &*ii <<" (";
-					int pos = (int) ii->rel_pos;
+					int pos = int(ii->rel_pos);
 					std::cout << pos;
-					if     (pos == 0){std::cout << "-UL";}
-					else if(pos == 1){std::cout << "-UR";}
-					else if(pos == 2){std::cout << "-DL";}
-					else if(pos == 3){std::cout << "-DR";}
-					else if(pos == 9){std::cout << "-HEAD";}
-					else{ }
+					if     (pos == position::up_left   ){std::cout << "-UL";}
+					else if(pos == position::up_right  ){std::cout << "-UR";}
+					else if(pos == position::down_left ){std::cout << "-DL";}
+					else if(pos == position::down_right){std::cout << "-DR";}
+					else if(pos == position::head      ){std::cout << "-HEAD";}
+					else if(pos == position::multigrid ){std::cout << "-GRID";}
+					else if(pos == position::invalid   ){std::cout << "-BAD ";}
+					else{ std::cout << "UNSPECIFIED " << pos; }
 					std::cout << ") -";
-					if     (jj == 0){std::cout << "--(Up)--";}
-					else if(jj == 1){std::cout << "-(Down)-";}
-					else if(jj == 2){std::cout << "-(Left)-";}
-					else if(jj == 3){std::cout << "-(Right)";}
-					else{ }
+					if     (jj == direction::up     ){std::cout << "--(Up)--";}
+					else if(jj == direction::down   ){std::cout << "-(Down)-";}
+					else if(jj == direction::left   ){std::cout << "-(Left)-";}
+					else if(jj == direction::right  ){std::cout << "-(Right)";}
+					else if(jj == direction::center ){std::cout << "(Center)";}
+					else if(jj == direction::null   ){std::cout << "-(Null)-";}
+					else if(jj == direction::invalid){std::cout << "-[BAD]--";}
+					else{ std::cout << "UNSPECIFIED " << jj; }
 					std::cout << "-> {Neighbor}: " << (void*) &*ptr;
 					pos = (int) ptr->rel_pos;
 					std::cout << " (" << pos;
-					if     (pos == 0){std::cout << "-UL";}
-					else if(pos == 1){std::cout << "-UR";}
-					else if(pos == 2){std::cout << "-DL";}
-					else if(pos == 3){std::cout << "-DR";}
-					else if(pos == 9){std::cout << "-HEAD";}
-					else{ }
-					std::cout << ")" << std::endl;
+					if     (pos == position::up_left   ){std::cout << "-UL  ";}
+					else if(pos == position::up_right  ){std::cout << "-UR  ";}
+					else if(pos == position::down_left ){std::cout << "-DL  ";}
+					else if(pos == position::down_right){std::cout << "-DR  ";}
+					else if(pos == position::head      ){std::cout << "-HEAD";}
+					else if(pos == position::multigrid ){std::cout << "-GRID";}
+					else if(pos == position::invalid   ){std::cout << "-BAD ";}
+					else{ std::cout << "UNSPECIFIED " << pos; }
+					std::cout << ") : ";
+					if     (reason == find_qualifier::valid_node   ){std::cout << "Valid";}
+					else if(reason == find_qualifier::is_data      ){std::cout << "Data";}
+					else if(reason == find_qualifier::out_of_bounds){std::cout << "Out of Bounds";}
+					else if(reason == find_qualifier::test1        ){std::cout << "Test.1";}
+					else if(reason == find_qualifier::test2        ){std::cout << "Test.2";}
+					else{ std::cout << "UNSPECIFIED " << reason; }
+					std::cout << std::endl;
 				}
 			}
 		}
@@ -211,9 +231,11 @@ class BidirQuadTree{
 
 	private:
 		typedef std::list<node_t> cont_t;
+		typedef std::tuple<node_iter, uint8_t> find_t; // Response from find
 		double phys_length; // Physical Significance : Length of a Side (Square)
 		gen_t Generator;
 		cont_t Nodes;
+		std::vector<std::unique_ptr<std::unordered_map<node_t*, find_t>>> cache;
 		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
 		
 		enum direction : uint8_t { // Express Position in the array contenxtually
@@ -225,6 +247,14 @@ class BidirQuadTree{
 			center			 = 4,
 			null			 = 5,
 			invalid			 = 6,
+		};
+
+		enum find_qualifier : uint8_t {
+			valid_node    = 0,
+			is_data		  = 1,
+			out_of_bounds = 2, // Out of Bounds
+			test1		  = 3,
+			test2		  = 4
 		};
 
 		constexpr uint8_t branch(node_iter &head, uint8_t pos){
@@ -252,7 +282,31 @@ class BidirQuadTree{
 			return ret;
 		}
 
-		constexpr node_iter& find_node(node_iter& Parent, uint8_t dir, int8_t rel_pos){
+		constexpr find_t find_node_sym(node_iter &Child, uint8_t dir, int8_t rel_pos){
+			if(Child->scale > 0) {
+				return caching_find_node(Child->parent, dir, rel_pos);
+				//return find_node(Child->parent, dir, rel_pos);
+			} else { return std::make_tuple(Child, find_qualifier::out_of_bounds ); } 
+		}
+
+		constexpr find_t caching_find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+			auto iter = cache[child_dir]->find(&*Parent);
+			if( iter != cache[child_dir]->end() ){
+				return iter->second;
+			} else {
+				std::lock_guard<std::mutex> lock(resource_lock);
+				auto match = find_node(Parent, child_dir, child_pos);
+				cache[child_dir]->emplace(&*Parent, match);
+				return match;
+			}
+		}
+
+		constexpr find_t find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+			/*
+			 * Entire Problem is approached from the prespective of the parent node
+			 * (Attempting to) respond to a request from it's child
+			 */
+
 			// TODO: Cached Lookup
 
 			// Look-up table routing[from][to]
@@ -270,31 +324,34 @@ class BidirQuadTree{
 				direction::left   // Request for {Right} mapped to Left
 			};
 
-			uint8_t pos = routing[rel_pos][dir];
-			if(pos != position::invalid){
-				return (Bit::is_set(Parent->is_node, pos)) ? (Parent->children[pos].node) : (Parent);
+			uint8_t pos = routing[child_pos][child_dir];
+			if(pos != position::invalid){ // Trivial Match Cases
+				if( Bit::is_set(Parent->is_node, pos) ) {
+					return std::make_tuple(Parent->children[pos].node,
+						find_qualifier::valid_node); // find_qualifier::valid_node
+				} else{
+					return std::make_tuple(Parent, find_qualifier::is_data);
+				}
 			} else {
 				// Recusively ask parent for neighbor
 				if(Parent->scale > 0){
-					node_iter& find = find_node(Parent->parent, dir, Parent->rel_pos);
-					if(find != Parent->parent){
-						return find;
-					} else {
-						return find;
+					auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
+					auto find = std::get<0>(tup);
+					auto reason = std::get<1>(tup);
+					if( (reason != find_qualifier::out_of_bounds) &&
+						(find != Parent->parent) ){
+						// Out of Bounds Disqualifies all further consideration
+						if( (find->scale) == (Parent->scale) ) {
+							auto false_dir = false_direction[child_dir];
+							return find_node(find, false_dir, child_pos);
+						} else {
+							return std::make_tuple(find, find_qualifier::test1);
+						}
+					} else { // Find Returned Parent, Implies Data (or Out of Bounds)
+						return tup;
 					}
-/*				
-				uint8_t false_dir = false_direction[pos]; // Reflection
-				if( (find->scale) == (Parent->scale) ) {
-					return( find->children[false_dir].node );
-				} else if( (find->scale) < (Parent->scale) ) { // Repeated stop condition
-					node_iter& find2 = find_node(find, false_dir, Parent->rel_pos);
-					if(find == find2){ return find2; } // Node May not Exist (Is Data)
-				} else { // Find Scale > Parent Scale
-					std::cerr << "Invalid Search, Result Smaller than Query" << std::endl;
-				}
-*/
 				} else {
-					return Parent; // Returns Parent if no match by N == 0
+					return std::make_tuple(Parent, find_qualifier::out_of_bounds);
 				}
 			}
 		}
