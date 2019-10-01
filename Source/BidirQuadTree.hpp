@@ -140,7 +140,7 @@ class BidirQuadTree{
 		{
 			Nodes.emplace_back(Generator.get());
 			for(auto ii = 0; ii < 4; ++ii){
-				cache.emplace_back(new std::unordered_map<node_t*, find_t>());
+				cache.emplace_back(new std::unordered_map<node_t*, find_node_t>());
 			}
 		}
 		~BidirQuadTree(){
@@ -178,7 +178,7 @@ class BidirQuadTree{
 			for(; ii != Nodes.end(); ++ii){
 				for(uint8_t jj = 0; jj < 4; ++jj){
 					auto tup = find_node_sym(ii, jj, ii->rel_pos); // Wrapper Call for Ease of Parsing
-					node_iter& ptr = std::get<0>(tup);
+					const node_iter& ptr = std::get<0>(tup);
 					int reason = int(std::get<1>(tup));
 					std::cout << "{Node}: " << (void*) &*ii <<" (";
 					int pos = int(ii->rel_pos);
@@ -231,11 +231,12 @@ class BidirQuadTree{
 
 	private:
 		typedef std::list<node_t> cont_t;
-		typedef std::tuple<node_iter, uint8_t> find_t; // Response from find
+		typedef std::tuple<const  node_iter, uint8_t> find_node_t; // Response from find
+		typedef std::tuple<const child_iter, uint8_t> find_data_t; // Response from find
 		double phys_length; // Physical Significance : Length of a Side (Square)
 		gen_t Generator;
 		cont_t Nodes;
-		std::vector<std::unique_ptr<std::unordered_map<node_t*, find_t>>> cache;
+		std::vector<std::unique_ptr<std::unordered_map<node_t*, find_node_t>>> cache;
 		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
 		
 		enum direction : uint8_t { // Express Position in the array contenxtually
@@ -253,8 +254,10 @@ class BidirQuadTree{
 			valid_node    = 0,
 			is_data		  = 1,
 			out_of_bounds = 2, // Out of Bounds
-			test1		  = 3,
-			test2		  = 4
+			multigrid     = 3, // Data returned points to multigrid node
+			iterp_needed  = 4, // Data is for (N-1) Refinement Level
+			test1		  = 5, // Unexpected Node State
+			test2		  = 6  // Unexpected Data State
 		};
 
 		constexpr uint8_t branch(node_iter &head, uint8_t pos){
@@ -282,14 +285,13 @@ class BidirQuadTree{
 			return ret;
 		}
 
-		constexpr find_t find_node_sym(node_iter &Child, uint8_t dir, int8_t rel_pos){
+		constexpr find_node_t find_node_sym(node_iter &Child, uint8_t dir, int8_t rel_pos){
 			if(Child->scale > 0) {
 				return caching_find_node(Child->parent, dir, rel_pos);
-				//return find_node(Child->parent, dir, rel_pos);
 			} else { return std::make_tuple(Child, find_qualifier::out_of_bounds ); } 
 		}
 
-		constexpr find_t caching_find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+		constexpr find_node_t caching_find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
 			auto iter = cache[child_dir]->find(&*Parent);
 			if( iter != cache[child_dir]->end() ){
 				return iter->second;
@@ -301,13 +303,68 @@ class BidirQuadTree{
 			}
 		}
 
-		constexpr find_t find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+		static constexpr find_data_t find_data(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
 			/*
 			 * Entire Problem is approached from the prespective of the parent node
 			 * (Attempting to) respond to a request from it's child
 			 */
 
-			// TODO: Cached Lookup
+			// Look-up table routing[from][to]
+			const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
+		// Direction: ---Up---           ---Down---		       ---Left---          ---Right---
+		/* UL */{position::invalid,  position::down_left,  position::invalid,   position::up_right},
+		/* UR */{position::invalid,  position::down_right, position::up_left,   position::invalid},
+		/* DL */{position::up_left,  position::invalid,    position::invalid,   position::down_right},
+		/* DR */{position::up_right, position::invalid,    position::down_left, position::invalid}
+			};
+			const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
+				direction::down,  // Request for {Up   } mapped to Down
+				direction::up,    // Request for {Down } mapped to Up
+				direction::right, // Request for {Left } mapped to Right
+				direction::left   // Request for {Right} mapped to Left
+			};
+
+			uint8_t pos = routing[child_pos][child_dir];
+			if(pos != position::invalid){ // Trivial Match Cases
+				if( Bit::is_set(Parent->is_node, pos) ) {
+					return std::make_tuple(Parent->children[pos].node->redux,
+						find_qualifier::multigrid); // find_qualifier::valid_node
+				} else{
+					return std::make_tuple(Parent->children[pos].data,
+						find_qualifier::is_data); // Simplest Outcome
+				}
+			} else {
+				if(Parent->scale > 0) {
+					auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
+					auto find = std::get<0>(tup);
+					auto reason = std::get<1>(tup);
+					if( (reason != find_qualifier::out_of_bounds) &&
+						(find != Parent->parent) ){
+						// Out of Bounds Disqualifies all further consideration
+						if( (find->scale) == (Parent->scale) ) {
+							auto false_dir = false_direction[child_dir];
+							return find_node(find, false_dir, child_pos);
+						} else if( (find->scale) < (Parent->scale) ) {
+							return std::make_tuple(find->redux,
+								find_qualifier::interp_needed);
+						} else {
+							return std::make_tuple(find, find_qualifier::test2);
+						}
+					} else { // Find Returned Parent, Implies Data (or Out of Bounds)
+						return tup;
+					}
+				} else {
+					return std::make_tuple(Parent->redux,
+						find_qualifier::out_of_bounds );
+				} 
+			}
+		}
+
+		static constexpr find_node_t find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+			/*
+			 * Entire Problem is approached from the prespective of the parent node
+			 * (Attempting to) respond to a request from it's child
+			 */
 
 			// Look-up table routing[from][to]
 			const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/

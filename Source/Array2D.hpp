@@ -89,13 +89,14 @@ class Array2D {
 					(pos & (ARRAY_ELEMENT_LENGTH - 1)));
 			}
 		};
+	/* ==== END (Matrix ITERATOR IMPLEMENTATION) === */
 		constexpr MatIterator begin() {
 			return MatIterator(&dat[1][1], 0);
 		}
 		constexpr MatIterator end() {
 			return MatIterator(&dat[1][1], ARRAY_ELEMENT_LENGTH*ARRAY_ELEMENT_LENGTH);
 		}
-	/* ==== END (Matrix ITERATOR IMPLEMENTATION) === */
+
 		/* Data Manipulation :: Populate Ghost Cells */
 		constexpr void fill_ghost_top(const Array2D& neighbor){
 			// Copies the bottom row of Neighbor into the top ghost row
