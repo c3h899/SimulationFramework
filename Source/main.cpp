@@ -49,6 +49,10 @@ int main(void){
 	Tree->print_list();
 	Tree->debug_find_node();
 
+	for(auto&& node : *Tree){
+		node.print_traits();
+	}
+
 	// std::cout << "plt::show() is a blocking function." << std::endl;
 	Tree->draw_tree();
     plt::show();
