@@ -25,54 +25,109 @@
  */
 template <class T>
 class ManagedVariable{
-	public:
-//		typedef std::list<T, std::pmr::polymorphic_allocator> container_t;
-		typedef std::list<T> container_t;
-		typedef typename std::list<T>::iterator iterator_t;
-//		constexpr ManagedVariable(std::size_t blocks = 0){ // Takes number of blocks/chunk
-		constexpr ManagedVariable(){ // Edited to address -Wunused
-//			mr = std::pmr::unsynchronized_pool_resource{sizeof(T), blocks};
+public:
+	// Constructor
+	//constexpr ManagedVariable(std::size_t blocks = 0){ // Takes number of blocks/chunk
+	constexpr ManagedVariable(){ // Edited to address -Wunused
+		//mr = std::pmr::unsynchronized_pool_resource{sizeof(T), blocks};
+	}
+	~ManagedVariable() {
+		auto num_elem = cont->size();
+		if(num_elem != 0){
+			std::cerr << "(Resource Leak) ManagedVariable Has: ";
+			std::cerr << num_elem << " Elements at destruction." << std::endl;
 		}
-		~ManagedVariable() {
-			auto num_elem = cont->size();
-			if(num_elem != 0){
-				std::cerr << "(Resource Leak) ManagedVariable Has: ";
-				std::cerr << num_elem << " Elements at destruction." << std::endl;
+	}
+	class MVar {
+		// Managed Variables behave like unique_ptrs (more or less)
+	public :
+		typedef typename ManagedVariable<T>::iterator_t iter_t;
+		// constexpr MVar(){parent = nullptr; std::cout << "Default" << std::endl;}
+		// MVar Gets copied, the call to free the resource happens twice
+		// Code segfaults.
+		constexpr MVar(const MVar&) = delete; // Copy Constructor
+		constexpr MVar(MVar&& other) : it(std::move(other.it)), 
+			parent(release(other)){ } // Move Constructor
+		constexpr MVar& operator=(const MVar& rhs) = delete; // Copy Assignment
+		constexpr MVar& operator=(MVar&& rhs){ // Move Assignement Operator
+			it = std::move(rhs.it);
+			parent = release(rhs);
+			return *this;
+		}
+		~MVar(){
+			if(parent != nullptr){
+				// std::cout << "Element: " << (void*) &*it;
+				// std::cout << " (Parent: " << (void*) parent << ")" << std::endl;
+				if(it != parent->cont->end()) {
+					std::lock_guard<std::mutex> lock(parent->resource_lock);
+					parent->cont->erase(it);
+				} else {
+					std::cerr << "Error, MVar expired prior to deletion" << std::endl;
+				}
 			}
 		}
-		constexpr iterator_t create_element(){
-			std::lock_guard<std::mutex> lock(resource_lock);
-			cont->emplace_back(T());
-			return std::prev(cont->end());
-		}
-		constexpr iterator_t create_element(T&& source){
-			std::lock_guard<std::mutex> lock(resource_lock);
-			cont->emplace_back(std::forward<T>(source));
-			return std::prev(cont->end());
-		}
-		template <class... Args> // Emplacement Constructor (In-place construction)
-		constexpr iterator_t emplace_element(Args&&... args){
-			std::lock_guard<std::mutex> lock(resource_lock);
-			cont->emplace_back(std::forward<Args>(args)...);
-			return std::prev(cont->end());
-		}
-		constexpr void erase(iterator_t &&element) {
-			if(element != cont->end()){cont->erase(std::forward<iterator_t>(element));}
-		}
-		constexpr friend std::ostream& operator<<(std::ostream &stream, const ManagedVariable<T> &var){
-			std::lock_guard<std::mutex> lock(var.resource_lock); // Very limited good
-			auto ii = var.cont->begin();
-			const auto jj = var.cont->end();
-			if(ii != jj){stream << *ii; ++ii;}			
-			for(; ii != jj; ++ii){stream << ";\n" << *ii;}
+		// Operators
+		constexpr T* operator->() const { return &*it; }
+		constexpr T& operator*() const { return *it; }
+
+		// Friends
+		constexpr friend std::ostream& operator<<(std::ostream &stream,
+			const MVar &V)
+		{
+			stream << *V;
 			return stream;
 		}
-	private:
-		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
-//		std::pmr::memory_resource& mr;
-//		container_t cont(&mr);
-		std::unique_ptr<container_t> cont = std::make_unique<container_t>();
-};
+	private :
+		iter_t it;
+		ManagedVariable* parent = nullptr; // ONLY USED AT DELETION
+		friend ManagedVariable<T>;
+		constexpr MVar(iter_t &&IT, ManagedVariable* Parent) : 
+			it(std::move(IT)), parent(Parent) { }
+		static constexpr ManagedVariable* release(MVar& old) noexcept {
+			auto temp = old.parent;
+			old.parent = nullptr;
+			return temp;
+		}
+	};
+	constexpr MVar create_element(){
+		std::lock_guard<std::mutex> lock(resource_lock);
+		cont->emplace_back(T());
+		return MVar(std::prev(cont->end()), this);
+	}
+	constexpr MVar create_element(T&& source){
+		std::lock_guard<std::mutex> lock(resource_lock);
+		cont->emplace_back(std::forward<T>(source));
+		return MVar(std::prev(cont->end()), this);
+	}
+	template <class... Args> // Emplacement Constructor (In-place construction)
+	constexpr MVar emplace_element(Args&&... args){
+		std::lock_guard<std::mutex> lock(resource_lock);
+		cont->emplace_back(std::forward<Args>(args)...);
+		return MVar(std::prev(cont->end()), this);
+	}
+	constexpr friend std::ostream& operator<<(std::ostream &stream, const ManagedVariable<T> &var){
+		std::lock_guard<std::mutex> lock(var.resource_lock); // Very limited good
+		auto ii = var.cont->begin();
+		const auto jj = var.cont->end();
+		if(ii != jj){stream << *ii; ++ii;}			
+		for(; ii != jj; ++ii){stream << ";\n" << *ii;}
+		return stream;
+	}
+private:
+	// Friends
+	friend class MVar;
 
+	// Type Definitions
+	typedef std::list<T> cont_t;
+	typedef typename cont_t::iterator iterator_t;
+	typedef typename std::unique_ptr<cont_t> ptr_t;
+	// typedef std::list<T, std::pmr::polymorphic_allocator> container_t;
+
+	// Resources
+	std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
+	// std::pmr::memory_resource& mr;
+	// std::list<T> cont(&mr);
+	ptr_t cont = std::make_unique<cont_t>();
+};
 
 #endif

@@ -24,36 +24,42 @@ int main(void){
 	typedef typename std::shared_ptr<BidirQuadTree<phys_t>> tree_prt_st; // Tree
 	typedef typename std::shared_ptr<phys_t> phys_ptr_st; // Shared Pointer
 
+/*
 	// Physics Data, Array2D, ManagedVariable --- Demonstration 
 	phys_ptr_st Phys = std::make_shared<phys_t>();
-/*
-	node_t PN1 = Phys->get();
-	node_t PN2 = Phys->get();
-	Phys->erase(PN2); // (!) Manual Deletions REQUIRED (!)
-
+	auto PN1 = Phys->get();
+	auto PN2 = Phys->get();
 	// Elementary Edit Operations
-	int ii = 0; for( auto&& x : *(PN1.phi) ) { x = float(ii++);	}
-	    ii = 0; for( auto&& x : *(PN1.rho) ) { x = float(ii*ii); ++ii; }
-
+	int ii = 0; for( auto&& x : *PN1.phi ) { x = float(ii++);	}
+	    ii = 0; for( auto&& x : *PN1.rho ) { x = float(ii*ii); ++ii; }
 	// Print Operation
 	std::cout << PN1 << std::endl;
-	Phys->erase(PN1); // (!) Manual Deletions REQUIRED (!)
+
+		ii = 0; for( auto&& x : *PN2.phi ) { x = float(2.0*ii++);	}
+	    ii = 0; for( auto&& x : *PN2.rho ) { x = float(2.0*ii*ii); ++ii; }
+	// Print Operation
+	std::cout << PN2 << std::endl;
 */
 
-	/*** BidirQuadTree --- Testing ***/
-	phys_ptr_st temp = std::shared_ptr<phys_t>(Phys);
-	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(temp), 1.0 );
+	//=== Physics Data --- Testing
+	
 
-	/*** Plotting --- Testing ***/
+	//=== BidirQuadTree --- Testing
+	phys_ptr_st Phys = std::make_shared<phys_t>();
+	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(Phys), 1.0 );
+
+	//=== Plotting --- Testing
 	Tree->grow_uniformly(1.0/256.0); // Hard-coded to give non-uniform branching
 	Tree->print_list();
-	Tree->debug_find_node();
+	//Tree->debug_find_node();
 
+/*
 	for(auto&& node : *Tree){
-		node.print_traits();
+		std::cout << node << std::endl;
 	}
+*/
 
-	// std::cout << "plt::show() is a blocking function." << std::endl;
+	std::cout << "plt::show() is a blocking function." << std::endl;
 	Tree->draw_tree();
     plt::show();
 }
