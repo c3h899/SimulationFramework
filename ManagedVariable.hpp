@@ -42,25 +42,26 @@ public:
 		// Managed Variables behave like unique_ptrs (more or less)
 	public :
 		typedef typename ManagedVariable<T>::iterator_t iter_t;
-		// constexpr MVar(){parent = nullptr; std::cout << "Default" << std::endl;}
-		// MVar Gets copied, the call to free the resource happens twice
-		// Code segfaults.
+		constexpr MVar(){std::cout << "I'm a bastard" << std::endl;}
+// MVar Gets copied, the call to free the resource happens twice
+// Code segfaults.
+
 		constexpr MVar(const MVar&) = delete; // Copy Constructor
 		constexpr MVar(MVar&& other) : it(std::move(other.it)), 
-			parent(release(other)){ } // Move Constructor
+			parent(other.parent){ } // Move Constructor
 		constexpr MVar& operator=(const MVar& rhs) = delete; // Copy Assignment
 		constexpr MVar& operator=(MVar&& rhs){ // Move Assignement Operator
 			it = std::move(rhs.it);
-			parent = release(rhs);
+			parent = std::move(rhs.parent);
 			return *this;
 		}
 		~MVar(){
 			if(parent != nullptr){
-				// std::cout << "Element: " << (void*) &*it;
-				// std::cout << " (Parent: " << (void*) parent << ")" << std::endl;
+				std::cout << (void*) parent << std::endl;
+				std::cout << parent->cont->size() << std::endl;
 				if(it != parent->cont->end()) {
 					std::lock_guard<std::mutex> lock(parent->resource_lock);
-					parent->cont->erase(it);
+//					parent->cont->erase(it);
 				} else {
 					std::cerr << "Error, MVar expired prior to deletion" << std::endl;
 				}
@@ -69,7 +70,6 @@ public:
 		// Operators
 		constexpr T* operator->() const { return &*it; }
 		constexpr T& operator*() const { return *it; }
-
 		// Friends
 		constexpr friend std::ostream& operator<<(std::ostream &stream,
 			const MVar &V)
@@ -80,15 +80,12 @@ public:
 	private :
 		iter_t it;
 		ManagedVariable* parent = nullptr; // ONLY USED AT DELETION
+		// Used by Managed Variable
 		friend ManagedVariable<T>;
 		constexpr MVar(iter_t &&IT, ManagedVariable* Parent) : 
 			it(std::move(IT)), parent(Parent) { }
-		static constexpr ManagedVariable* release(MVar& old) noexcept {
-			auto temp = old.parent;
-			old.parent = nullptr;
-			return temp;
-		}
 	};
+
 	constexpr MVar create_element(){
 		std::lock_guard<std::mutex> lock(resource_lock);
 		cont->emplace_back(T());

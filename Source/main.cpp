@@ -24,33 +24,46 @@ int main(void){
 	typedef typename std::shared_ptr<BidirQuadTree<phys_t>> tree_prt_st; // Tree
 	typedef typename std::shared_ptr<phys_t> phys_ptr_st; // Shared Pointer
 
-	// Physics Data, Array2D, ManagedVariable --- Demonstration 
-	phys_ptr_st Phys = std::make_shared<phys_t>();
 /*
-	node_t PN1 = Phys->get();
-	node_t PN2 = Phys->get();
-	Phys->erase(PN2); // (!) Manual Deletions REQUIRED (!)
-
+	//=== Physics Data --- Testing
+	phys_ptr_st Phys = std::make_shared<phys_t>();
+	auto PN1 = Phys->get();
+	auto PN2 = Phys->get();
 	// Elementary Edit Operations
-	int ii = 0; for( auto&& x : *(PN1.phi) ) { x = float(ii++);	}
-	    ii = 0; for( auto&& x : *(PN1.rho) ) { x = float(ii*ii); ++ii; }
-
+	int ii = 0; for( auto&& x : *PN1.phi ) { x = float(ii++);	}
+	    ii = 0; for( auto&& x : *PN1.rho ) { x = float(ii*ii); ++ii; }
 	// Print Operation
 	std::cout << PN1 << std::endl;
-	Phys->erase(PN1); // (!) Manual Deletions REQUIRED (!)
+
+		ii = 0; for( auto&& x : *PN2.phi ) { x = float(2.0*ii++);	}
+	    ii = 0; for( auto&& x : *PN2.rho ) { x = float(2.0*ii*ii); ++ii; }
+	// Print Operation
+	std::cout << PN2 << std::endl;
 */
 
-	/*** BidirQuadTree --- Testing ***/
-	phys_ptr_st temp = std::shared_ptr<phys_t>(Phys);
-	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(temp), 1.0 );
+	//=== BidirQuadTree --- Testing
+	phys_ptr_st Phys = std::make_shared<phys_t>();
+	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(Phys), 1.0 );
 
-	/*** Plotting --- Testing ***/
-	Tree->grow_uniformly(1.0/256.0); // Hard-coded to give non-uniform branching
+	//=== Tree --- Testing
+	Tree->grow_uniformly(1.0/128.0); // Hard-coded to give non-uniform branching
 	Tree->print_list();
-	Tree->debug_find_node();
-
-	// std::cout << "plt::show() is a blocking function." << std::endl;
+	//Tree->debug_find_node();
 	Tree->draw_tree();
+    std::cout << "plt::show() is a blocking function." << std::endl;
     plt::show();
+	
+	//=== Tree Iterator --- Debugging
+	
+	for(auto iter = Tree->begin(); iter != Tree->end(); ++iter){
+		//std::cout << *iter << std::endl;
+		auto pos = iter.get_position();
+		auto scale = iter.get_scale();
+		for(int ii = 0; ii < scale; ++ii){std::cout << "      ";}
+		std::cout << "Scale: " << scale << ", Position: (";
+		std::cout << std::get<0>(pos) << ", " << std::get<1>(pos) << ")" << std::endl;
+	}
+
+	// Pictures
 }
 

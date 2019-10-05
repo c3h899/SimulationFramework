@@ -22,28 +22,36 @@ public:
 	 * the individual resource nodes.
 	 */
 	typedef typename ManagedVariable<T>::MVar MVar;
-	typedef typename ManagedVariable<uint8_t>::MVar MBound;
 	enum boundary_type : uint8_t {
 		none	  = 0, // Not a Bounary (Testing for Zero can be quite fast)
 		dirichlet = 1, // First-type
 		neumann   = 2 // Second-type
 	};
+/*
+constexpr MVar(const MVar&) = delete; // Copy Constructor
+constexpr MVar(MVar&& other) : it(std::move(other.it)),
+	parent(other.parent) { } // Move Constructor
+constexpr MVar& operator=(const MVar& rhs) = delete; // Copy Assignment
+constexpr MVar& operator=(MVar&& rhs){ // Move Assignement Operator
+	it = std::move(rhs.it);
+	parent = rhs.parent;
+	return *this;
+}
+*/
 	class PhysicsNode{
 		// MVar(s) are effectively unique pointers.
 		// Move semantics are FORBIDDEN
 	public:
-		MVar   phi;
-		MVar   rho;
-		MBound bounds;
+		MVar phi;
+		MVar rho;
 		// === Constructor ===
-		constexpr PhysicsNode(MVar &&Phi, MVar &&Rho, MBound && Bounds) : // <== This one insists on copying
-			phi(std::move(Phi)), rho(std::move(Rho)), bounds(std::move(Bounds)) { } 
+		constexpr PhysicsNode(MVar &&Phi, MVar &&Rho) : phi(std::move(Phi)),
+			rho(std::move(Rho)) { }
 		// Copy Constructor
 		constexpr PhysicsNode(const PhysicsNode&) = delete;
 		// Move Constructor
 		constexpr PhysicsNode(PhysicsNode&& other) : 
-			phi(std::move(other.phi)), rho(std::move(other.rho)),
-			bounds(std::move(other.bounds)) { }
+			phi(std::move(other.phi)), rho(std::move(other.rho)) { }
 		// === Destructor ===
 		~PhysicsNode() { }
 		// === Operators ===
@@ -51,9 +59,8 @@ public:
 		constexpr PhysicsNode& operator=(const PhysicsNode& rhs) = delete;
 		// Move Assignment
 		constexpr PhysicsNode& operator=(PhysicsNode&& rhs){
-			phi    = std::move(rhs.phi);
-			rho    = std::move(rhs.rho);
-			bounds = std::move(rhs.bounds);
+			phi = std::move(rhs.phi);
+			rho = std::move(rhs.rho);
 			return *this;
 		}
 		// === Friends ===
@@ -65,12 +72,13 @@ public:
 			return stream;
 		}
 	private:
+		MVar phi_it; // Track Iterators for Deletion
+		MVar rho_it;
 	};
 	typedef PhysicsNode return_t; // Used externally
-	constexpr return_t get(){
-		return PhysicsNode(	std::forward<MVar>(Phi.create_element()),
-							std::forward<MVar>(Rho_E.create_element()),
-							std::forward<MBound>(Bounds.create_element()) );
+	constexpr std::unique_ptr<PhysicsNode> get(){
+		return std::make_unique( (std::forward<MVar>(Phi.create_element()) ),
+								 (std::forward<MVar>(Rho_E.create_element()) ));
 	}
 private:
 	/*
@@ -78,7 +86,6 @@ private:
 	 * and deletion of PhysicsNode(s).
 	 */
 	ManagedVariable<T> Phi, Rho_E; // (ES) Potential [V]; Charge Density [C/m^3]
-	ManagedVariable<uint8_t> Bounds; // Boundary Conditions
 };
 
 #endif // PHYSICS_H_

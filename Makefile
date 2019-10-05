@@ -88,7 +88,7 @@ VPATH=$(SOURCEDIR):$(shell find $(LIBDIR) -maxdepth 1 -type d -printf '%f:')
 CPPFLAGS = -Wall $(CPP_DEBUG) $(COMPILE_OPTIMIZATION) -MMD $(COMPILE_OPTIONS) -I$(SOURCEDIR) $(shell find $(LIBDIR) -maxdepth 1 -type d -printf ' -I%p') -I$(PYTHON_INCLUDE)
 
 # [CPP] "Extra flags to give to the C++ compiler."
-CXXFLAGS = -fPIC -std=c++17 -fno-elide-constructors -fno-exceptions
+CXXFLAGS = -fPIC -std=c++17 -fno-exceptions -fno-elide-constructors
 
 # [C] "Extra flags to give to the C compiler."
 CFLAGS =
