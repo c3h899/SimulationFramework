@@ -134,7 +134,6 @@ private:
 	child_iter children[4]; // Polymorphic Array of children
 	uint8_t rel_pos = 0x00; // Node's Position Relative to it's Parent's Collection
 };
-
 template<class G>
 class BidirQuadTree{
 	// TODO: Thead This
@@ -167,7 +166,7 @@ public:
 		}
 	}
 		// ==== BEGIN (ITERATOR IMPLEMENTATION) === //
-/*
+//==============================================================================================
 	class DFSTreeIterator {
 	public:
 		// === Typedef and Specification ===
@@ -180,9 +179,11 @@ public:
 			double Y_norm = 0.0, bool MG = true, int8_t Pos = index_pos::multigrid_i) : 
 			present_node(start), x_norm(X_norm), y_norm(Y_norm), pos(Pos), 
 			include_mg(MG)
-		{
-//			push();
-//			if(!include_mg){++this;}
+		{ 
+			pos = index_pos::end_i;
+			push();
+			pos = Pos;
+			if(!include_mg){++*this;}
 		}
 		// Destructor
 		~DFSTreeIterator() { }; // Nothing to Do
@@ -215,65 +216,39 @@ public:
 					break;
 			}
 		}
-		constexpr node_iter& get_node(){return present_node;}
-		constexpr std::tuple<double, double> get_position(){
-			// Retuns Lower Left Corner of Data in Normalized Coordinates
-			double temp_x = x_norm;
-			double temp_y = y_norm;
-			switch(pos){
-				case index_pos::up_left_i :
-					temp_y += 0.5*exp2(-1.0*present_node->scale);
-					break;
-				case index_pos::up_right_i :
-					temp_x += 0.5*exp2(-1.0*present_node->scale);
-					temp_y += 0.5*exp2(-1.0*present_node->scale);
-					break;
-				case index_pos::down_left_i :
-					break;
-				case index_pos::down_right_i :
-					temp_x += 0.5*exp2(-1.0*present_node->scale);
-					break;
-				default : break;
-			}
-			return std::make_tuple(temp_x, temp_y);
-		}
-		constexpr int8_t get_scale(){
-			int8_t offset = (pos == index_pos::multigrid_i) ? 0 : 1;
-			return int8_t(present_node->scale + offset);
+		constexpr node_iter get_node(){return present_node;}
+		constexpr std::tuple<double, double> get_position(){ return present_position(); }
+		constexpr int get_scale(){
+			int offset = (pos == index_pos::multigrid_i) ? 0 : 1;
+			return present_node->scale + offset;
 		}
 		// === Operators === //
 		// Pre-fix Increment
 		constexpr self_type& operator++(){
-			bool is_data = hist.empty();
-			while(!is_data){
+			bool increment = true;
+			while((increment) && (pos != index_pos::end_i)){
 				// Increment (or ascend deque)
 				if(pos < 3) {
-					++pos;
-					if(Bit::is_set(present_node->is_node, pos)){ // Node
-						push(); // Track Previous State; pos tracks old
-						present_node = present_node->children[3].node;
-						switch(pos){ // Child's implies a factor of 0.5
-							case index_pos::up_left_i :
-								y_norm += exp2(-1.0*present_node->scale);
-								break;
-							case index_pos::up_right_i :
-								x_norm += exp2(-1.0*present_node->scale);
-								y_norm += exp2(-1.0*present_node->scale);
-								break;
-							case index_pos::down_left_i :
-								break;
-							case index_pos::down_right_i :
-								x_norm += exp2(-1.0*present_node->scale);
-								break;
-							default : break;
-						}
+					++pos; // Unconditional Increment
+					increment = Bit::is_set(present_node->is_node, pos);
+					if(increment) { // Node
+						push(); // Track Previous State; pos tracks 
+						// Calculate New Position
+						auto temp = present_position();
+						x_norm = std::get<0>(temp);
+						y_norm = std::get<1>(temp);
+						// Update the position
+						present_node = present_node->children[pos].node;
+						// Reset the Position Counter
 						pos = index_pos::multigrid_i; // Gets Incremented
-						is_data = hist.empty() ? (true) : (include_mg);
-					} else { is_data = true; } // Data Element
+						//increment = !( (include_mg) | Hist.empty() );
+						increment = !include_mg;
+					}
 				} else {
-					pop(); // Load previous state; increment accounted for
-					is_data = hist.empty(); // Test if Deque consumed
-					if(is_data) {pos = index_pos::end_i;} // Comparison Flag
+					if( !Hist.empty() ){
+						pop(); // Load previous state; increment accounted for
+						increment = true; // Unconditionally Increment recovered value.
+					}
 				}
 			}
 			return (*this);
@@ -308,24 +283,45 @@ public:
 		};
 	private:
 		// Previous Node, Position in Index, X_norm, Y_norm
-		typedef std::tuple<node_iter&, int8_t, double, double> hist_t;
-		std::deque<hist_t> hist;
-		node_iter& present_node;
-		double x_norm;
-		double y_norm;
-		int8_t pos;
-		bool include_mg;
+		typedef std::tuple<node_iter, int8_t, double, double> hist_t;
+		std::deque<hist_t> Hist;
+		node_iter present_node;
+		double x_norm = 0.0;
+		double y_norm = 0.0;
+		int8_t pos = index_pos::multigrid_i;
+		bool include_mg = true;
 		// Unified Push Statement
 		constexpr void push(){
-			hist.push_back(std::make_tuple<&present_node, pos, x_norm, y_norm>);
+			Hist.push_back(std::make_tuple(present_node, pos, x_norm, y_norm));
 		}
 		// Unified Pop Statement
 		constexpr void pop(){
-			present_node = std::get<0>( hist.back() );
-			pos          = std::get<1>( hist.back() );
-			x_norm       = std::get<2>( hist.back() );
-			y_norm       = std::get<3>( hist.back() );
-			hist.pop_back();
+			present_node = std::get<0>( Hist.back() );
+			pos          = std::get<1>( Hist.back() );
+			x_norm       = std::get<2>( Hist.back() );
+			y_norm       = std::get<3>( Hist.back() );
+			Hist.pop_back();
+		}
+		constexpr std::tuple<double, double> present_position(){
+			double temp_x = x_norm; // Reference Parent Node's Position
+			double temp_y = y_norm; // Reference Parent Node's Position
+			double scale  = -1.0*present_node->scale;
+			switch(pos){
+				case index_pos::up_left_i :
+					temp_y += 0.5*exp2(scale);
+					break;
+				case index_pos::up_right_i :
+					temp_x += 0.5*exp2(scale);
+					temp_y += 0.5*exp2(scale);
+					break;
+				case index_pos::down_left_i :
+					break;
+				case index_pos::down_right_i :
+					temp_x += 0.5*exp2(scale);
+					break;
+				default : break;
+			}
+			return std::make_tuple(temp_x, temp_y);
 		}
 	};
 	// ==== END (Matrix ITERATOR IMPLEMENTATION) === //
@@ -339,7 +335,7 @@ public:
 		return DFSTreeIterator( start, 0.0, 0.0, true,
 			DFSTreeIterator::index_pos::end_i);
 	}
-*/
+// ===============================================================================================
 	// Drawing Functions TODO: Move out of Class, Enumerate as Friend Functions
 	void draw_tree(){
 		std::lock_guard<std::mutex> lock(resource_lock);
@@ -406,13 +402,11 @@ public:
 			}
 		}
 	}
-
 	void print_list(){
 		auto ii = Nodes.begin();
 		std::string predicate = "";
 		recursive_print_list(ii, predicate);
 	}
-
 	private:
 		typedef std::list<node_t> cont_t;
 		typedef std::tuple<const  node_iter, uint8_t> find_node_t; // Response from find
@@ -586,7 +580,7 @@ public:
 			}
 		}
 		constexpr void recursive_grow(node_iter& head, int8_t N){
-			for(uint8_t ii = 2; ii < 4; ++ii){ // Depth-first search
+			for(uint8_t ii = 0; ii < 4; ++ii){ // Depth-first search
 				if( Bit::is_set(head->is_node, ii) ){
 					std::cerr << "Attempted to Grow in Presence of Nodes" << std::endl;				
 				} else {
