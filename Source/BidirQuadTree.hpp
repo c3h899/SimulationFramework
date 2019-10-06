@@ -147,7 +147,7 @@ public:
 	typedef typename node_t::child_iter child_iter;
 
 	constexpr BidirQuadTree(gen_t &&Gen, double len) : 
-		phys_length(len), Generator(std::move(Gen))
+		si_unit_length(len), Generator(std::move(Gen))
 	{
 		Nodes.emplace_back( std::move(Generator.get()) );
 		for(auto ii = 0; ii < 4; ++ii){
@@ -175,10 +175,10 @@ public:
 		typedef node_t& reference;
 		// === Principle Class Interacions === //
 		// Constructor
-		constexpr DFSTreeIterator(node_iter& start, double X_norm = 0.0,
+		constexpr DFSTreeIterator(node_iter& start, double SI_Len = 1.0, double X_norm = 0.0,
 			double Y_norm = 0.0, bool MG = true, int8_t Pos = index_pos::multigrid_i) : 
-			present_node(start), x_norm(X_norm), y_norm(Y_norm), pos(Pos), 
-			include_mg(MG)
+			present_node(start), si_unit_length(SI_Len), x_norm(X_norm), y_norm(Y_norm), 
+			pos(Pos), include_mg(MG)
 		{ 
 			pos = index_pos::end_i;
 			push();
@@ -193,6 +193,7 @@ public:
 			if(this != &other){
 				hist(other.hist);
 				node_iter(other.node_iter);
+				si_unit_length = other.si_unit_length;
 				x_norm = other.x_norm;
 				y_norm = other.y_norm;
 				index(other.index);
@@ -217,10 +218,17 @@ public:
 			}
 		}
 		constexpr node_iter get_node(){return present_node;}
-		constexpr std::tuple<double, double> get_position(){ return present_position(); }
+		constexpr std::tuple<double, double> get_position(){
+			auto here = present_position();
+			double si_x = si_unit_length * std::get<0>(here);
+			double si_y = si_unit_length * std::get<1>(here);
+			return std::make_tuple(si_x, si_y);
+		}
 		constexpr int get_scale(){
-			int offset = (pos == index_pos::multigrid_i) ? 0 : 1;
-			return present_node->scale + offset;
+			return present_node->scale + elem_scale_correction();
+		}
+		constexpr double get_scale_si(){
+			return si_unit_length*exp2( -1.0*( get_scale() ) );
 		}
 		// === Operators === //
 		// Pre-fix Increment
@@ -286,13 +294,13 @@ public:
 		typedef std::tuple<node_iter, int8_t, double, double> hist_t;
 		std::deque<hist_t> Hist;
 		node_iter present_node;
+		double si_unit_length;
 		double x_norm = 0.0;
 		double y_norm = 0.0;
 		int8_t pos = index_pos::multigrid_i;
 		bool include_mg = true;
-		// Unified Push Statement
-		constexpr void push(){
-			Hist.push_back(std::make_tuple(present_node, pos, x_norm, y_norm));
+		constexpr int elem_scale_correction(){
+			return (pos == index_pos::multigrid_i) ? 0 : 1;
 		}
 		// Unified Pop Statement
 		constexpr void pop(){
@@ -301,6 +309,10 @@ public:
 			x_norm       = std::get<2>( Hist.back() );
 			y_norm       = std::get<3>( Hist.back() );
 			Hist.pop_back();
+		}
+		// Unified Push Statement
+		constexpr void push(){
+			Hist.push_back(std::make_tuple(present_node, pos, x_norm, y_norm));
 		}
 		constexpr std::tuple<double, double> present_position(){
 			double temp_x = x_norm; // Reference Parent Node's Position
@@ -327,12 +339,12 @@ public:
 	// ==== END (Matrix ITERATOR IMPLEMENTATION) === //
 	constexpr DFSTreeIterator begin(){
 		auto&& start = Nodes.begin();
-		return DFSTreeIterator( start, 0.0, 0.0, true,
+		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true,
 			DFSTreeIterator::index_pos::multigrid_i);
 	}
 	constexpr DFSTreeIterator end(){
 		auto&& start = Nodes.begin();
-		return DFSTreeIterator( start, 0.0, 0.0, true,
+		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true,
 			DFSTreeIterator::index_pos::end_i);
 	}
 // ===============================================================================================
@@ -341,12 +353,12 @@ public:
 		std::lock_guard<std::mutex> lock(resource_lock);
 		auto head = Nodes.begin();
 		if( head != Nodes.end() ){
-			recursive_draw_node(head, 0.0, 0.0, phys_length);
+			recursive_draw_node(head, 0.0, 0.0, si_unit_length);
 		}
 	}
 	constexpr void grow_uniformly(double h){
 		auto head = Nodes.begin();
-		double ratio = ceil(log2(phys_length / h));
+		double ratio = ceil(log2(si_unit_length / h));
 		double cell = double(ARRAY_ELEMENT_POWER);
 		double Nd = ratio - cell - 1;
 		int8_t N = (Nd < 0) ? int8_t(0) : int8_t(Nd);
@@ -411,7 +423,7 @@ public:
 		typedef std::list<node_t> cont_t;
 		typedef std::tuple<const  node_iter, uint8_t> find_node_t; // Response from find
 		typedef std::tuple<const child_iter, uint8_t> find_data_t; // Response from find
-		double phys_length; // Physical Significance : Length of a Side (Square)
+		double si_unit_length; // Physical Significance : Length of a Side (Square)
 		gen_t Generator;
 		cont_t Nodes;
 		std::vector<std::unique_ptr<std::unordered_map<node_t*, find_node_t>>> cache;

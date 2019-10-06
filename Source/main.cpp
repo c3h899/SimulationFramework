@@ -42,11 +42,12 @@ int main(void){
 */
 
 	//=== BidirQuadTree --- Testing
+	double si_unit_len = 128.0;
 	phys_ptr_st Phys = std::make_shared<phys_t>();
-	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(Phys), 1.0 );
+	tree_prt_st Tree = std::make_shared<tree_t>( std::forward<phys_ptr_st>(Phys), si_unit_len );
 
 	//=== Tree --- Testing
-	Tree->grow_uniformly(1.0/128.0); // Hard-coded to give non-uniform branching
+	Tree->grow_uniformly(si_unit_len/128.0); // Hard-coded to give non-uniform branching
 	Tree->print_list();
 	//Tree->debug_find_node();
 	Tree->draw_tree();
