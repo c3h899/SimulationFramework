@@ -27,34 +27,52 @@
 template<class G>
 class BidirQuadTree;
 
+// Enumerations
+enum position : uint8_t { // Express Position in the array contenxtually
+	// 2D Values are Aliased to 3D Representation, Back
+	// (!) NO NOT EDIT. Values are Used as direct array access modifies.
+	  up_left        = 0,
+	  up_right       = 1,
+	down_left        = 2,
+	down_right       = 3,
+	/* Unused
+	  up_left_back	 = up_left,			
+	  up_left_front	 = 4,
+	  up_right_back	 = up_right,
+	  up_right_front = 5,
+	down_left_back 	 = down_left,
+	down_left_front	 = 6,
+	down_right_back	 = down_right,
+	down_right_front = 7,
+	 */
+	multigrid        = 8,
+	head			 = 9,
+	invalid			 = 10,
+};
+enum index_pos : int8_t{
+	multigrid_i 	 = -1,
+	up_left_i		 = position::up_left,
+	up_right_i		 = position::up_right,
+	down_left_i		 = position::down_left,
+	down_right_i	 = position::down_right,
+	end_i			 = 5
+};
+enum direction : uint8_t { // Express Position in the array contenxtually
+	// (!) NO NOT EDIT. Values are Used as direct array access modifies.
+	up				 = 0,
+	down			 = 1,
+	left			 = 2,
+	right			 = 3,
+	center			 = 4,
+	null			 = 5,
+	invalid_dir		 = 6,
+};
+
 template<class G>
 class TreeNode {
 public:
 	typedef typename G::return_t return_t;
 	typedef typename std::list<TreeNode<G>>::iterator node_iter; 
-
-	enum position : uint8_t { // Express Position in the array contenxtually
-		// 2D Values are Aliased to 3D Representation, Back
-		// (!) NO NOT EDIT. Values are Used as direct array access modifies.
-		  up_left        = 0,
-		  up_right       = 1,
-		down_left        = 2,
-		down_right       = 3,
-		/* Unused
-		  up_left_back  = up_left,			
-		  up_left_front  = 4,
-		  up_right_back = up_right,
-		  up_right_front = 5,
-		down_left_back  = down_left,
-		down_left_front  = 6,
-		down_right_back = down_right,
-		down_right_front = 7,
-		 */
-		multigrid        = 8,
-		head			 = 9,
-		invalid			 = 10,
-	};
-
 	// === Constructor ===
 	// Constructor for head node
 	constexpr TreeNode(G *gen) : redux( std::move( gen->get() ) ), 
@@ -134,6 +152,7 @@ private:
 	child_iter children[4]; // Polymorphic Array of children
 	uint8_t rel_pos = 0x00; // Node's Position Relative to it's Parent's Collection
 };
+
 template<class G>
 class BidirQuadTree{
 	// TODO: Thead This
@@ -143,7 +162,6 @@ public:
 	typedef typename G::return_t return_t;
 	typedef TreeNode<G> node_t;
 	typedef typename node_t::node_iter node_iter;
-	typedef typename node_t::position position;
 	typedef typename node_t::child_iter child_iter;
 
 	constexpr BidirQuadTree(gen_t &&Gen, double len) : 
@@ -280,15 +298,6 @@ public:
 		constexpr bool operator!=(const self_type& rhs) const {
 			return ((pos != rhs.pos) || (present_node != rhs.present_node));
 		}
-		// Enumerations
-		enum index_pos : int8_t{
-			multigrid_i  = -1,
-			up_left_i    = position::up_left,
-			up_right_i   = position::up_right,
-			down_left_i  = position::down_left,
-			down_right_i = position::down_right,
-			end_i        = 5
-		};
 	private:
 		// Previous Node, Position in Index, X_norm, Y_norm
 		typedef std::tuple<node_iter, int8_t, double, double> hist_t;
@@ -339,13 +348,11 @@ public:
 	// ==== END (Matrix ITERATOR IMPLEMENTATION) === //
 	constexpr DFSTreeIterator begin(){
 		auto&& start = Nodes.begin();
-		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true,
-			DFSTreeIterator::index_pos::multigrid_i);
+		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true, index_pos::multigrid_i);
 	}
 	constexpr DFSTreeIterator end(){
 		auto&& start = Nodes.begin();
-		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true,
-			DFSTreeIterator::index_pos::end_i);
+		return DFSTreeIterator( start, si_unit_length, 0.0, 0.0, true, index_pos::end_i);
 	}
 // ===============================================================================================
 	// Drawing Functions TODO: Move out of Class, Enumerate as Friend Functions
@@ -384,13 +391,13 @@ public:
 				else if(pos == position::invalid   ){std::cout << "-BAD ";}
 				else{ std::cout << "UNSPECIFIED " << pos; }
 				std::cout << ") -";
-				if     (jj == direction::up     ){std::cout << "--(Up)--";}
-				else if(jj == direction::down   ){std::cout << "-(Down)-";}
-				else if(jj == direction::left   ){std::cout << "-(Left)-";}
-				else if(jj == direction::right  ){std::cout << "-(Right)";}
-				else if(jj == direction::center ){std::cout << "(Center)";}
-				else if(jj == direction::null   ){std::cout << "-(Null)-";}
-				else if(jj == direction::invalid){std::cout << "-[BAD]--";}
+				if     (jj == direction::up         ){std::cout << "--(Up)--";}
+				else if(jj == direction::down       ){std::cout << "-(Down)-";}
+				else if(jj == direction::left       ){std::cout << "-(Left)-";}
+				else if(jj == direction::right      ){std::cout << "-(Right)";}
+				else if(jj == direction::center     ){std::cout << "(Center)";}
+				else if(jj == direction::null       ){std::cout << "-(Null)-";}
+				else if(jj == direction::invalid_dir){std::cout << "-[BAD]--";}
 				else{ std::cout << "UNSPECIFIED " << jj; }
 				std::cout << "-> {Neighbor}: " << (void*) &*ptr;
 				pos = (int) ptr->rel_pos;
@@ -419,287 +426,277 @@ public:
 		std::string predicate = "";
 		recursive_print_list(ii, predicate);
 	}
-	private:
-		typedef std::list<node_t> cont_t;
-		typedef std::tuple<const  node_iter, uint8_t> find_node_t; // Response from find
-		typedef std::tuple<const child_iter, uint8_t> find_data_t; // Response from find
-		double si_unit_length; // Physical Significance : Length of a Side (Square)
-		gen_t Generator;
-		cont_t Nodes;
-		std::vector<std::unique_ptr<std::unordered_map<node_t*, find_node_t>>> cache;
-		std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
-		// Enumerations
-		enum direction : uint8_t { // Express Position in the array contenxtually
-			// (!) NO NOT EDIT. Values are Used as direct array access modifies.
-			up				 = 0,
-			down			 = 1,
-			left			 = 2,
-			right			 = 3,
-			center			 = 4,
-			null			 = 5,
-			invalid			 = 6,
-		};
-		enum find_qualifier : uint8_t {
-			valid_node    = 0,
-			is_data		  = 1,
-			out_of_bounds = 2, // Out of Bounds
-			multigrid     = 3, // Data returned points to multigrid node
-			iterp_needed  = 4, // Data is for (N-1) Refinement Level
-			test1		  = 5, // Unexpected Node State
-			test2		  = 6  // Unexpected Data State
-		};
-		// Methods
-		constexpr uint8_t branch(node_iter &head, uint8_t pos){
-			uint8_t ret = 1;
+private:
+	typedef std::list<node_t> cont_t;
+	typedef std::tuple<const  node_iter, uint8_t> find_node_t; // Response from find
+	typedef std::tuple<const child_iter, uint8_t> find_data_t; // Response from find
+	double si_unit_length; // Physical Significance : Length of a Side (Square)
+	gen_t Generator;
+	cont_t Nodes;
+	std::vector<std::unique_ptr<std::unordered_map<node_t*, find_node_t>>> cache;
+	std::mutex resource_lock; // TODO: Improve Scaling by replacing Mutex
+	// Enumerations
+	enum find_qualifier : uint8_t {
+		valid_node    = 0,
+		is_data		  = 1,
+		out_of_bounds = 2, // Out of Bounds
+		multigrid     = 3, // Data returned points to multigrid node
+		iterp_needed  = 4, // Data is for (N-1) Refinement Level
+		test1		  = 5, // Unexpected Node State
+		test2		  = 6  // Unexpected Data State
+	};
+	// Methods
+	constexpr uint8_t branch(node_iter &head, uint8_t pos){
+		uint8_t ret = 1;
+		std::lock_guard<std::mutex> lock(resource_lock);
+		if(!Bit::is_set(head->is_node, pos)){
+			Nodes.emplace_back( std::move(Generator.get()), head, pos );
+			Bit::set( head->is_node, pos );
+			head->children[pos].node = std::prev(Nodes.end());
+			ret = 0;
+		} else {
+			std::cerr << "Error, Node is Already Branched" << std::endl;
+			ret = 1;
+		}
+		return ret;
+	}
+	constexpr uint8_t delete_node(node_iter &target){
+		uint8_t ret = 1;
+		if( !(target->is_node) ){ // Verify all child nodes are Data
+			recursive_free(target);
+			ret = 0;
+		} else {
+			ret = 1;
+		}
+		return ret;
+	}
+	constexpr find_node_t find_node_sym(node_iter &Child, uint8_t dir, int8_t rel_pos){
+		if(Child->scale > 0) {
+			return caching_find_node(Child->parent, dir, rel_pos);
+		} else { return std::make_tuple(Child, find_qualifier::out_of_bounds ); } 
+	}
+	constexpr find_node_t caching_find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+		auto iter = cache[child_dir]->find(&*Parent);
+		if( iter != cache[child_dir]->end() ){
+			return iter->second;
+		} else {
 			std::lock_guard<std::mutex> lock(resource_lock);
-			if(!Bit::is_set(head->is_node, pos)){
-				Nodes.emplace_back( std::move(Generator.get()), head, pos );
-				Bit::set( head->is_node, pos );
-				head->children[pos].node = std::prev(Nodes.end());
-				ret = 0;
-			} else {
-				std::cerr << "Error, Node is Already Branched" << std::endl;
-				ret = 1;
+			auto match = find_node(Parent, child_dir, child_pos);
+			cache[child_dir]->emplace(&*Parent, match);
+			return match;
+		}
+	}
+	static constexpr find_data_t find_data(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+		/*
+		 * Entire Problem is approached from the prespective of the parent node
+		 * (Attempting to) respond to a request from it's child
+		 */
+		// Look-up table routing[from][to]
+		const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
+			{position::invalid,  position::down_left,  position::invalid,   position::up_right},
+			{position::invalid,  position::down_right, position::up_left,   position::invalid},
+			{position::up_left,  position::invalid,    position::invalid,   position::down_right},
+			{position::up_right, position::invalid,    position::down_left, position::invalid}
+		};
+		const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
+			direction::down,  // Request for {Up   } mapped to Down
+			direction::up,    // Request for {Down } mapped to Up
+			direction::right, // Request for {Left } mapped to Right
+			direction::left   // Request for {Right} mapped to Left
+		};
+		uint8_t pos = routing[child_pos][child_dir];
+		if(pos != position::invalid){ // Trivial Match Cases
+			if( Bit::is_set(Parent->is_node, pos) ) {
+				return std::make_tuple(Parent->children[pos].node->redux,
+					find_qualifier::multigrid); // find_qualifier::valid_node
+			} else{
+				return std::make_tuple(Parent->children[pos].data,
+					find_qualifier::is_data); // Simplest Outcome
 			}
-			return ret;
-		}
-		constexpr uint8_t delete_node(node_iter &target){
-			uint8_t ret = 1;
-			if( !(target->is_node) ){ // Verify all child nodes are Data
-				recursive_free(target);
-				ret = 0;
+		} else {
+			if(Parent->scale > 0) {
+				auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
+				auto find = std::get<0>(tup);
+				auto reason = std::get<1>(tup);
+				if( (reason != find_qualifier::out_of_bounds) &&
+					(find != Parent->parent) ){
+					// Out of Bounds Disqualifies all further consideration
+					if( (find->scale) == (Parent->scale) ) {
+						auto false_dir = false_direction[child_dir];
+						return find_node(find, false_dir, child_pos);
+					} else if( (find->scale) < (Parent->scale) ) {
+						return std::make_tuple(find->redux,
+							find_qualifier::interp_needed);
+					} else {
+						return std::make_tuple(find, find_qualifier::test2);
+					}
+				} else { // Find Returned Parent, Implies Data (or Out of Bounds)
+					return tup;
+				}
 			} else {
-				ret = 1;
+				return std::make_tuple(Parent->redux,
+					find_qualifier::out_of_bounds );
+			} 
+		}
+	}
+	static constexpr find_node_t find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
+		/*
+		 * Entire Problem is approached from the prespective of the parent node
+		 * (Attempting to) respond to a request from it's child
+		 */
+		// Look-up table routing[from][to]
+		const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
+			{position::invalid,  position::down_left,  position::invalid,   position::up_right},
+			{position::invalid,  position::down_right, position::up_left,   position::invalid},
+			{position::up_left,  position::invalid,    position::invalid,   position::down_right},
+			{position::up_right, position::invalid,    position::down_left, position::invalid}
+		};
+		const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
+			direction::down,  // Request for {Up   } mapped to Down
+			direction::up,    // Request for {Down } mapped to Up
+			direction::right, // Request for {Left } mapped to Right
+			direction::left   // Request for {Right} mapped to Left
+		};
+		uint8_t pos = routing[child_pos][child_dir];
+		if(pos != position::invalid){ // Trivial Match Cases
+			if( Bit::is_set(Parent->is_node, pos) ) {
+				return std::make_tuple(Parent->children[pos].node,
+					find_qualifier::valid_node); // find_qualifier::valid_node
+			} else{
+				return std::make_tuple(Parent, find_qualifier::is_data);
 			}
-			return ret;
-		}
-		constexpr find_node_t find_node_sym(node_iter &Child, uint8_t dir, int8_t rel_pos){
-			if(Child->scale > 0) {
-				return caching_find_node(Child->parent, dir, rel_pos);
-			} else { return std::make_tuple(Child, find_qualifier::out_of_bounds ); } 
-		}
-		constexpr find_node_t caching_find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
-			auto iter = cache[child_dir]->find(&*Parent);
-			if( iter != cache[child_dir]->end() ){
-				return iter->second;
+		} else {
+			// Recusively ask parent for neighbor
+			if(Parent->scale > 0){
+				auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
+				auto find = std::get<0>(tup);
+				auto reason = std::get<1>(tup);
+				if( (reason != find_qualifier::out_of_bounds) &&
+					(find != Parent->parent) ){
+					// Out of Bounds Disqualifies all further consideration
+					if( (find->scale) == (Parent->scale) ) {
+						auto false_dir = false_direction[child_dir];
+						return find_node(find, false_dir, child_pos);
+					} else {
+						return std::make_tuple(find, find_qualifier::test1);
+					}
+				} else { // Find Returned Parent, Implies Data (or Out of Bounds)
+					return tup;
+				}
 			} else {
+				return std::make_tuple(Parent, find_qualifier::out_of_bounds);
+			}
+		}
+	}
+	constexpr void recursive_grow(node_iter& head, int8_t N){
+		for(uint8_t ii = 0; ii < 4; ++ii){ // Depth-first search
+			if( Bit::is_set(head->is_node, ii) ){
+				std::cerr << "Attempted to Grow in Presence of Nodes" << std::endl;				
+			} else {
+				// Re-ordered in response to GCC warning:
+				// -Wconversion promoted ~Unsigned is always non-zero
+				branch(head, ii);
+				auto child = head->children[ii].node;
+				if(child->scale < N) {
+					recursive_grow(child, N);
+				}
+			}
+		}
+	}
+	void recursive_print_list(node_iter& head, std::string predicate){
+		std::cout << predicate;			
+		if(head->rel_pos == position::head){
+			std::cout << "{Head}  ";
+		} else {
+			std::cout << "{Child} ";
+		}
+		std::cout << &*head << " (" << (int) head->rel_pos << ")" << std::endl;
+		predicate = predicate + "   |  ";
+		for(auto ii = 0; ii < 4; ++ii){
+			if(Bit::is_set(head->is_node, ii)){
+				recursive_print_list(head->children[ii].node, predicate);
+			} else {
+				std::cout << predicate << "{Data}  ";
+				std::cout << (void*) &head->children[ii].data << " (";
+				std::cout << (int) ii << ")" << std::endl;
+			}
+		}
+	}
+	static constexpr node_iter get_node(node_iter* base, uint8_t pos, int8_t order){
+		int8_t delta = base->scale - order;
+		return ( (delta < 0) && Bit::is_set(base->is_node, pos) ) ? 
+			(base->children[pos].node) : (base);
+	}
+	constexpr uint8_t prune(node_iter& target){
+		/* 
+		 * (!) Warning NO effort to populate most recent results to
+		 * Multigrid reduction node will be made. This MUST be done prior.
+		 */
+		uint8_t ret = 1;
+		auto parent = target->parent;
+		if( parent != Nodes.end() ){ // Can Not Prune the Head of Tree
+			if( !(target.is_node) ){ // Verify all child nodes are Data
 				std::lock_guard<std::mutex> lock(resource_lock);
-				auto match = find_node(Parent, child_dir, child_pos);
-				cache[child_dir]->emplace(&*Parent, match);
-				return match;
-			}
-		}
-		static constexpr find_data_t find_data(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
-			/*
-			 * Entire Problem is approached from the prespective of the parent node
-			 * (Attempting to) respond to a request from it's child
-			 */
-			// Look-up table routing[from][to]
-			const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
-				{position::invalid,  position::down_left,  position::invalid,   position::up_right},
-				{position::invalid,  position::down_right, position::up_left,   position::invalid},
-				{position::up_left,  position::invalid,    position::invalid,   position::down_right},
-				{position::up_right, position::invalid,    position::down_left, position::invalid}
-			};
-			const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
-				direction::down,  // Request for {Up   } mapped to Down
-				direction::up,    // Request for {Down } mapped to Up
-				direction::right, // Request for {Left } mapped to Right
-				direction::left   // Request for {Right} mapped to Left
-			};
-			uint8_t pos = routing[child_pos][child_dir];
-			if(pos != position::invalid){ // Trivial Match Cases
-				if( Bit::is_set(Parent->is_node, pos) ) {
-					return std::make_tuple(Parent->children[pos].node->redux,
-						find_qualifier::multigrid); // find_qualifier::valid_node
-				} else{
-					return std::make_tuple(Parent->children[pos].data,
-						find_qualifier::is_data); // Simplest Outcome
-				}
+				// Push the Child Node's Data to the Parent
+				parent->children[target.rel_pos] = std::move(target.redux);
+				Bit::clear(parent->is_node, target.rel_pos);
+				// (!) Untested, is believe to avoid leaking resrouces
+				Nodes.erase(target);
+				ret = 0;
 			} else {
-				if(Parent->scale > 0) {
-					auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
-					auto find = std::get<0>(tup);
-					auto reason = std::get<1>(tup);
-					if( (reason != find_qualifier::out_of_bounds) &&
-						(find != Parent->parent) ){
-						// Out of Bounds Disqualifies all further consideration
-						if( (find->scale) == (Parent->scale) ) {
-							auto false_dir = false_direction[child_dir];
-							return find_node(find, false_dir, child_pos);
-						} else if( (find->scale) < (Parent->scale) ) {
-							return std::make_tuple(find->redux,
-								find_qualifier::interp_needed);
-						} else {
-							return std::make_tuple(find, find_qualifier::test2);
-						}
-					} else { // Find Returned Parent, Implies Data (or Out of Bounds)
-						return tup;
-					}
-				} else {
-					return std::make_tuple(Parent->redux,
-						find_qualifier::out_of_bounds );
-				} 
+				std::cerr << "Attemped to Prune() node with child nodes." << std::endl;
+				ret = 2;
+			}
+		} else {
+			std::cerr << "Attemped to Prune() node with no parent." << std::endl;
+			ret = 1;
+		}
+		return ret;
+	}
+	// Drawing Functions TODO: Move out of Class, Enumerate as Friend Functions
+	void recursive_draw_node (node_iter &node, double x, double y, double h){
+		double h_prime = 0.5*h;
+		// Down Left
+		if( Bit::is_set(node->is_node, position::down_left) ){
+			auto next_node = node->children[position::down_left].node;
+			recursive_draw_node(next_node, x, y, h_prime);
+		} else { plot_rect(x, y, h_prime, ARRAY_ELEMENT_LENGTH); }
+		// Up Left	
+		double temp_y = y + h_prime;
+		if( Bit::is_set(node->is_node, position::up_left) ){
+			auto next_node = node->children[position::up_left].node;
+			recursive_draw_node(next_node, x, temp_y, h_prime);
+		} else { plot_rect(x, temp_y, h_prime, ARRAY_ELEMENT_LENGTH); }
+		// Up Right
+		double temp_x = x + h_prime;
+		if( Bit::is_set(node->is_node, position::up_right) ){
+			auto next_node = node->children[position::up_right].node;
+			recursive_draw_node(next_node, temp_x, temp_y, h_prime);
+		} else { plot_rect(temp_x, temp_y, h_prime, ARRAY_ELEMENT_LENGTH); }
+		// Down Right
+		if( Bit::is_set(node->is_node, position::down_right) ){
+			auto next_node = node->children[position::down_right].node;
+			recursive_draw_node(next_node, temp_x, y, h_prime);
+		} else { plot_rect(temp_x, y, h_prime, ARRAY_ELEMENT_LENGTH); }
+	}
+	constexpr void recursive_free(node_iter& head){
+		// (!) Untested, is believe to avoid leaking resrouces
+		std::lock_guard<std::mutex> lock(resource_lock);
+		const node_iter end = Nodes.end();
+		recursive_free_worker(head, end);
+	}
+	constexpr void recursive_free_worker(node_iter& head, const node_iter& end){
+		// Free the resources tracked in the tree
+		// Warning (!) NOT Thread Safe
+		// USE recursive_free(node_iter& head) as entry point
+		for(auto ii = 0; ii < 4; ++ii){
+			if(Bit::is_set(head->is_node, ii)){
+				auto temp = head->children[ii].node;
+				if(temp != end){ recursive_free_worker(temp, end); }
 			}
 		}
-		static constexpr find_node_t find_node(node_iter& Parent, uint8_t child_dir, int8_t child_pos){
-			/*
-			 * Entire Problem is approached from the prespective of the parent node
-			 * (Attempting to) respond to a request from it's child
-			 */
-			// Look-up table routing[from][to]
-			const uint8_t routing[4][4] = { /** When Comparisions are just too slow **/
-				{position::invalid,  position::down_left,  position::invalid,   position::up_right},
-				{position::invalid,  position::down_right, position::up_left,   position::invalid},
-				{position::up_left,  position::invalid,    position::invalid,   position::down_right},
-				{position::up_right, position::invalid,    position::down_left, position::invalid}
-			};
-			const uint8_t false_direction[4] = { /** ...or coding switch statements suck. **/
-				direction::down,  // Request for {Up   } mapped to Down
-				direction::up,    // Request for {Down } mapped to Up
-				direction::right, // Request for {Left } mapped to Right
-				direction::left   // Request for {Right} mapped to Left
-			};
-			uint8_t pos = routing[child_pos][child_dir];
-			if(pos != position::invalid){ // Trivial Match Cases
-				if( Bit::is_set(Parent->is_node, pos) ) {
-					return std::make_tuple(Parent->children[pos].node,
-						find_qualifier::valid_node); // find_qualifier::valid_node
-				} else{
-					return std::make_tuple(Parent, find_qualifier::is_data);
-				}
-			} else {
-				// Recusively ask parent for neighbor
-				if(Parent->scale > 0){
-					auto tup = find_node(Parent->parent, child_dir, Parent->rel_pos);
-					auto find = std::get<0>(tup);
-					auto reason = std::get<1>(tup);
-					if( (reason != find_qualifier::out_of_bounds) &&
-						(find != Parent->parent) ){
-						// Out of Bounds Disqualifies all further consideration
-						if( (find->scale) == (Parent->scale) ) {
-							auto false_dir = false_direction[child_dir];
-							return find_node(find, false_dir, child_pos);
-						} else {
-							return std::make_tuple(find, find_qualifier::test1);
-						}
-					} else { // Find Returned Parent, Implies Data (or Out of Bounds)
-						return tup;
-					}
-				} else {
-					return std::make_tuple(Parent, find_qualifier::out_of_bounds);
-				}
-			}
-		}
-		constexpr void recursive_grow(node_iter& head, int8_t N){
-			for(uint8_t ii = 0; ii < 4; ++ii){ // Depth-first search
-				if( Bit::is_set(head->is_node, ii) ){
-					std::cerr << "Attempted to Grow in Presence of Nodes" << std::endl;				
-				} else {
-					// Re-ordered in response to GCC warning:
-					// -Wconversion promoted ~Unsigned is always non-zero
-					branch(head, ii);
-					auto child = head->children[ii].node;
-					if(child->scale < N) {
-						recursive_grow(child, N);
-					}
-				}
-			}
-		}
-		void recursive_print_list(node_iter& head, std::string predicate){
-			std::cout << predicate;			
-			if(head->rel_pos == position::head){
-				std::cout << "{Head}  ";
-			} else {
-				std::cout << "{Child} ";
-			}
-			std::cout << &*head << " (" << (int) head->rel_pos << ")" << std::endl;
-			predicate = predicate + "   |  ";
-			for(auto ii = 0; ii < 4; ++ii){
-				if(Bit::is_set(head->is_node, ii)){
-					recursive_print_list(head->children[ii].node, predicate);
-				} else {
-					std::cout << predicate << "{Data}  ";
-					std::cout << (void*) &head->children[ii].data << " (";
-					std::cout << (int) ii << ")" << std::endl;
-				}
-			}
-		}
-		static constexpr node_iter get_node(node_iter* base, uint8_t pos, int8_t order){
-			int8_t delta = base->scale - order;
-			return ( (delta < 0) && Bit::is_set(base->is_node, pos) ) ? 
-				(base->children[pos].node) : (base);
-		}
-		constexpr uint8_t prune(node_iter& target){
-			/* 
-			 * (!) Warning NO effort to populate most recent results to
-			 * Multigrid reduction node will be made. This MUST be done prior.
-			 */
-			uint8_t ret = 1;
-			auto parent = target->parent;
-			if( parent != Nodes.end() ){ // Can Not Prune the Head of Tree
-				if( !(target.is_node) ){ // Verify all child nodes are Data
-					std::lock_guard<std::mutex> lock(resource_lock);
-					// Push the Child Node's Data to the Parent
-					parent->children[target.rel_pos] = std::move(target.redux);
-					Bit::clear(parent->is_node, target.rel_pos);
-					// (!) Untested, is believe to avoid leaking resrouces
-					Nodes.erase(target);
-					ret = 0;
-				} else {
-					std::cerr << "Attemped to Prune() node with child nodes." << std::endl;
-					ret = 2;
-				}
-			} else {
-				std::cerr << "Attemped to Prune() node with no parent." << std::endl;
-				ret = 1;
-			}
-			return ret;
-		}
-		// Drawing Functions TODO: Move out of Class, Enumerate as Friend Functions
-		void recursive_draw_node (node_iter &node, double x, double y, double h){
-			double h_prime = 0.5*h;
-			// Down Left
-			if( Bit::is_set(node->is_node, position::down_left) ){
-				auto next_node = node->children[position::down_left].node;
-				recursive_draw_node(next_node, x, y, h_prime);
-			} else { plot_rect(x, y, h_prime, ARRAY_ELEMENT_LENGTH); }
-			// Up Left	
-			double temp_y = y + h_prime;
-			if( Bit::is_set(node->is_node, position::up_left) ){
-				auto next_node = node->children[position::up_left].node;
-				recursive_draw_node(next_node, x, temp_y, h_prime);
-			} else { plot_rect(x, temp_y, h_prime, ARRAY_ELEMENT_LENGTH); }
-			// Up Right
-			double temp_x = x + h_prime;
-			if( Bit::is_set(node->is_node, position::up_right) ){
-				auto next_node = node->children[position::up_right].node;
-				recursive_draw_node(next_node, temp_x, temp_y, h_prime);
-			} else { plot_rect(temp_x, temp_y, h_prime, ARRAY_ELEMENT_LENGTH); }
-			// Down Right
-			if( Bit::is_set(node->is_node, position::down_right) ){
-				auto next_node = node->children[position::down_right].node;
-				recursive_draw_node(next_node, temp_x, y, h_prime);
-			} else { plot_rect(temp_x, y, h_prime, ARRAY_ELEMENT_LENGTH); }
-		}
-		constexpr void recursive_free(node_iter& head){
-			// (!) Untested, is believe to avoid leaking resrouces
-			std::lock_guard<std::mutex> lock(resource_lock);
-			const node_iter end = Nodes.end();
-			recursive_free_worker(head, end);
-		}
-		constexpr void recursive_free_worker(node_iter& head, const node_iter& end){
-			// Free the resources tracked in the tree
-			// Warning (!) NOT Thread Safe
-			// USE recursive_free(node_iter& head) as entry point
-			for(auto ii = 0; ii < 4; ++ii){
-				if(Bit::is_set(head->is_node, ii)){
-					auto temp = head->children[ii].node;
-					if(temp != end){ recursive_free_worker(temp, end); }
-				}
-			}
-			Nodes.erase(head);
-		}
+		Nodes.erase(head);
+	}
 };
 
 #endif // BIDIR_QUAD_TREE_H_
